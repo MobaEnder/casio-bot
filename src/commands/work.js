@@ -15,7 +15,7 @@ const jobs = [
   { name: "Bán bánh mì vỉa hè", min: 20000, max: 50000 },
   { name: "Dọn chuồng chó", min: 30000, max: 70000 },
   { name: "Cày rank thuê", min: 50000, max: 100000 },
-  { name: "Giá làm người yêu anh trai hàng xóm", min: 10000, max: 30000 },
+  { name: "Giả làm người yêu anh trai hàng xóm", min: 10000, max: 30000 },
   { name: "Trông mèo cho hàng xóm", min: 20000, max: 60000 },
 ];
 
@@ -40,11 +40,8 @@ module.exports = {
   async execute(interaction) {
     const userId = interaction.user.id;
 
-    const user = await User.findOneAndUpdate(
-      { userId },
-      {},
-      { upsert: true, new: true }
-    );
+    let user = await User.findOne({ userId });
+    if (!user) user = await User.create({ userId });
 
     if (user.banned) {
       return interaction.reply({
@@ -55,6 +52,11 @@ module.exports = {
 
     const now = Date.now();
     const cooldown = 60 * 60 * 1000;
+
+    // 🛡️ Fix dữ liệu date lỗi cũ
+    if (user.lastWork && !(user.lastWork instanceof Date)) {
+      user.lastWork = new Date(user.lastWork);
+    }
 
     if (user.lastWork && now - user.lastWork.getTime() < cooldown) {
       const remaining = cooldown - (now - user.lastWork.getTime());
@@ -80,7 +82,7 @@ module.exports = {
       .setTitle("💼 BẠN ĐÃ ĐI LÀM!")
       .setDescription(
         `🧑‍💻 **Công việc:** ${job.name}\n` +
-        `💸 **Thu nhập:** ${reward.toLocaleString()} VND\n\n` +
+        `💸 **Thu nhập:** ${reward.toLocaleString("vi-VN")} VND\n\n` +
         `😂 ${joke}`
       )
       .setFooter({ text: "HOP BOT • Work System" })
