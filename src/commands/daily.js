@@ -14,6 +14,11 @@ module.exports = {
     let user = await User.findOne({ userId });
     if (!user) user = await User.create({ userId });
 
+    // 🛡️ Fix lỗi date object cũ
+    if (user.lastDaily && !(user.lastDaily instanceof Date)) {
+      user.lastDaily = new Date(user.lastDaily);
+    }
+
     if (user.lastDaily && now - user.lastDaily < cooldown) {
       const remain = cooldown - (now - user.lastDaily);
       const h = Math.floor(remain / 3600000);
@@ -32,7 +37,7 @@ module.exports = {
     }
 
     // 🎁 Reward random
-    const reward = Math.floor(Math.random() * 50000) + 200000; // 50k → 200k
+    const reward = Math.floor(Math.random() * 150001) + 50000; // 50k → 200k
 
     user.money += reward;
     user.lastDaily = now;
@@ -42,13 +47,13 @@ module.exports = {
       .setColor("Green")
       .setTitle("🎉 DAILY REWARD!")
       .setDescription(
-        `💸 Bạn nhận được **${reward.toLocaleString()} VND**\n💰 Số dư: **${user.money.toLocaleString()} VND**`
+        `💸 Bạn nhận được **${reward.toLocaleString("vi-VN")} VND**\n💰 Số dư: **${user.money.toLocaleString("vi-VN")} VND**`
       )
       .setThumbnail("https://cdn-icons-png.flaticon.com/512/10384/10384161.png")
       .setFooter({ text: "HOP BOT • Daily System" })
       .setTimestamp();
 
-    const msg = await interaction.reply({ embeds: [embed], fetchReply: true });
-    setTimeout(() => msg.delete().catch(() => {}), 15000);
+    const msg = await interaction.reply({ embeds: [embed], withResponse: true });
+    setTimeout(() => msg.resource.message.delete().catch(() => {}), 15000);
   },
 };
