@@ -1,11 +1,11 @@
 const mongoose = require("mongoose");
 
-module.exports = async () => {
-  try {
-    await mongoose.connect(process.env.MONGO_URL);
-    console.log("✅ MongoDB Railway connected");
-  } catch (err) {
-    console.error("❌ MongoDB error:", err);
-    process.exit(1);
-  }
-};
+async function connectDB() {
+  const uri = process.env.MONGO_URL;
+  if (!uri) throw new Error("❌ MONGO_URL chưa được set trong .env");
+
+  await mongoose.connect(uri);
+  console.log("✅ MongoDB connected");
+}
+
+module.exports = connectDB;
