@@ -12,6 +12,7 @@ const {
 const User = require("../models/User");
 
 const games = new Map();
+const MIN_BET = 10000; // 💰 TIỀN TỐI THIỂU
 
 // ===== QUẶNG THEO TẦNG =====
 const lowOres = [
@@ -43,7 +44,7 @@ function getOreByFloor(floor) {
   return rareOres[Math.floor(Math.random() * rareOres.length)];
 }
 
-// ===== MULTIPLIER THEO TẦNG =====
+// ===== MULTIPLIER =====
 function getMultiplier(floor) {
   if (floor <= 10)
     return Math.floor(Math.random() * 3) + 1; // x1-x3
@@ -54,7 +55,7 @@ function getMultiplier(floor) {
   return Math.floor(Math.random() * 6) + 4; // x4-x9
 }
 
-// ===== TỶ LỆ SẬP =====
+// ===== RISK =====
 function getRisk(floor) {
   if (floor <= 10)
     return 5 + floor; // 6% -> 15%
@@ -65,7 +66,7 @@ function getRisk(floor) {
   return 35 + (floor - 20) * 2; // 37% -> ~67%
 }
 
-// ===== MÀU EMBED =====
+// ===== COLOR =====
 function getColorByFloor(floor) {
   if (floor <= 10) return 0x2ecc71;
   if (floor <= 20) return 0xf1c40f;
@@ -86,10 +87,10 @@ module.exports = {
       .setCustomId("invest_amount")
       .setLabel("Số tiền bạn muốn đầu tư (VND)")
       .setStyle(TextInputStyle.Short)
-      .setRequired(true);
+      .setRequired(true)
+      .setPlaceholder("Tối thiểu 10.000 VND");
 
     modal.addComponents(new ActionRowBuilder().addComponents(input));
-
     await interaction.showModal(modal);
   },
 
@@ -104,6 +105,15 @@ module.exports = {
 
     if (isNaN(amount) || amount <= 0)
       return interaction.editReply("❌ Số tiền không hợp lệ!");
+
+    // 🔴 KIỂM TRA TỐI THIỂU
+    if (amount < MIN_BET) {
+      return interaction.editReply(
+        `⚠️ Số tiền tối thiểu để đào hầm là **${MIN_BET.toLocaleString(
+          "vi-VN"
+        )} VND**`
+      );
+    }
 
     let user = await User.findOne({ userId: interaction.user.id });
     if (!user) user = await User.create({ userId: interaction.user.id });
