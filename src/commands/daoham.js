@@ -12,9 +12,9 @@ const {
 const User = require("../models/User");
 
 const games = new Map();
-const MIN_BET = 10000; // 💰 TIỀN TỐI THIỂU
+const MIN_BET = 10000;
 
-// ===== QUẶNG THEO TẦNG =====
+// ===== QUẶNG =====
 const lowOres = [
   { name: "🪨 Đá thường", value: 10000 },
   { name: "🔹 Đá vôi", value: 15000 },
@@ -33,7 +33,7 @@ const rareOres = [
   { name: "🔥 Hồng Ngọc Thượng Hạng", value: 500000 },
 ];
 
-// ===== RANDOM QUẶNG =====
+// ===== RANDOM QUẶNG THEO TẦNG =====
 function getOreByFloor(floor) {
   if (floor <= 10)
     return lowOres[Math.floor(Math.random() * lowOres.length)];
@@ -55,7 +55,7 @@ function getMultiplier(floor) {
   return Math.floor(Math.random() * 6) + 4; // x4-x9
 }
 
-// ===== RISK =====
+// ===== TỶ LỆ SẬP =====
 function getRisk(floor) {
   if (floor <= 10)
     return 5 + floor; // 6% -> 15%
@@ -63,10 +63,10 @@ function getRisk(floor) {
   if (floor <= 20)
     return 15 + (floor - 10) * 2; // 17% -> 35%
 
-  return 35 + (floor - 20) * 2; // 37% -> ~67%
+  return 35 + (floor - 20) * 2; // 37% -> 67%
 }
 
-// ===== COLOR =====
+// ===== MÀU EMBED =====
 function getColorByFloor(floor) {
   if (floor <= 10) return 0x2ecc71;
   if (floor <= 20) return 0xf1c40f;
@@ -87,10 +87,11 @@ module.exports = {
       .setCustomId("invest_amount")
       .setLabel("Số tiền bạn muốn đầu tư (VND)")
       .setStyle(TextInputStyle.Short)
-      .setRequired(true)
-      .setPlaceholder("Tối thiểu 10.000 VND");
+      .setPlaceholder("Tối thiểu 10.000 VND")
+      .setRequired(true);
 
     modal.addComponents(new ActionRowBuilder().addComponents(input));
+
     await interaction.showModal(modal);
   },
 
@@ -106,23 +107,16 @@ module.exports = {
     if (isNaN(amount) || amount <= 0)
       return interaction.editReply("❌ Số tiền không hợp lệ!");
 
-    // 🔴 KIỂM TRA TỐI THIỂU
-    if (amount < MIN_BET) {
+    if (amount < MIN_BET)
       return interaction.editReply(
-        `⚠️ Số tiền tối thiểu để đào hầm là **${MIN_BET.toLocaleString(
-          "vi-VN"
-        )} VND**`
+        `⚠️ Số tiền tối thiểu là **${MIN_BET.toLocaleString("vi-VN")} VND**`
       );
-    }
 
     let user = await User.findOne({ userId: interaction.user.id });
     if (!user) user = await User.create({ userId: interaction.user.id });
 
     if (user.money < amount)
       return interaction.editReply("❌ Bạn không đủ tiền!");
-
-    user.money -= amount;
-    await user.save();
 
     const floor = 1;
     const ore = getOreByFloor(floor);
@@ -142,7 +136,9 @@ module.exports = {
         `💰 Đầu tư: **${amount.toLocaleString("vi-VN")} VND**\n\n` +
         `${ore.name} x${multi}\n` +
         `💎 Thu được: **${earned.toLocaleString("vi-VN")} VND**\n\n` +
-        `🔥 Tổng hiện tại: **${earned.toLocaleString("vi-VN")} VND**`
+        `🔥 Nếu rút bây giờ: **${(amount + earned).toLocaleString(
+          "vi-VN"
+        )} VND**`
       );
 
     const row = new ActionRowBuilder().addComponents(
@@ -164,9 +160,11 @@ module.exports = {
     if (!game)
       return interaction.reply({ content: "❌ Game đã kết thúc!", flags: 64 });
 
+    // ===== RÚT LUI =====
     if (interaction.customId === "daoham_stop") {
       const user = await User.findOne({ userId: interaction.user.id });
-      user.money += game.total;
+
+      user.money += game.invested + game.total;
       await user.save();
 
       games.delete(interaction.user.id);
@@ -177,19 +175,24 @@ module.exports = {
             .setColor(0x00ff00)
             .setTitle("🏆 RÚT LUI AN TOÀN")
             .setDescription(
-              `💰 Bạn mang về **${game.total.toLocaleString("vi-VN")} VND**`
+              `💰 Bạn nhận được **${(
+                game.invested + game.total
+              ).toLocaleString("vi-VN")} VND**`
             ),
         ],
         components: [],
       });
     }
 
+    // ===== ĐÀO TIẾP =====
     if (interaction.customId === "daoham_continue") {
       game.floor++;
 
       if (game.floor > 36) {
         const user = await User.findOne({ userId: interaction.user.id });
-        user.money += game.total * 2;
+
+        const reward = (game.invested + game.total) * 2;
+        user.money += reward;
         await user.save();
 
         games.delete(interaction.user.id);
@@ -200,9 +203,7 @@ module.exports = {
               .setColor(0xffd700)
               .setTitle("👑 CHINH PHỤC 36 TẦNG!")
               .setDescription(
-                `🎉 Thưởng x2: **${(game.total * 2).toLocaleString(
-                  "vi-VN"
-                )} VND**`
+                `🎉 Thưởng x2: **${reward.toLocaleString("vi-VN")} VND**`
               ),
           ],
           components: [],
@@ -211,7 +212,13 @@ module.exports = {
 
       const risk = getRisk(game.floor);
 
+      // ===== SẬP HẦM =====
       if (Math.random() * 100 < risk) {
+        const user = await User.findOne({ userId: interaction.user.id });
+
+        user.money -= game.invested;
+        await user.save();
+
         games.delete(interaction.user.id);
 
         return interaction.update({
@@ -220,9 +227,7 @@ module.exports = {
               .setColor(0xff0000)
               .setTitle("💥 SẬP HẦM!")
               .setDescription(
-                `❌ Bạn mất toàn bộ **${game.total.toLocaleString(
-                  "vi-VN"
-                )} VND**`
+                `❌ Bạn mất **${game.invested.toLocaleString("vi-VN")} VND**`
               ),
           ],
           components: [],
@@ -242,7 +247,9 @@ module.exports = {
           `⚠️ Tỷ lệ sập: **${risk}%**\n\n` +
           `${ore.name} x${multi}\n` +
           `💎 Thu được: **${earned.toLocaleString("vi-VN")} VND**\n\n` +
-          `🔥 Tổng hiện tại: **${game.total.toLocaleString("vi-VN")} VND**`
+          `🔥 Nếu rút bây giờ: **${(
+            game.invested + game.total
+          ).toLocaleString("vi-VN")} VND**`
         );
 
       return interaction.update({ embeds: [embed] });
