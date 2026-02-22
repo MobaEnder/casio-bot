@@ -97,6 +97,7 @@ client.on(Events.InteractionCreate, async interaction => {
       const duangua = require("./commands/duangua");
       const daga = require("./commands/daga");
       const reset = require("./commands/reset");
+      const reset = require("./commands/daoham");
 
       if (interaction.customId.startsWith("taixiu_") && taixiu.handleButton)
         return await taixiu.handleButton(interaction);
@@ -115,6 +116,9 @@ client.on(Events.InteractionCreate, async interaction => {
       
       if (interaction.customId.startsWith("reset_") && reset.handleButton)
         return await reset.handleButton(interaction);
+
+      if (interaction.customId.startsWith("daoham_") && daoham.handleButton)
+        return await daoham.handleButton(interaction);
     }
 
     // Modals
@@ -123,6 +127,7 @@ client.on(Events.InteractionCreate, async interaction => {
       const baucua = require("./commands/baucua");
       const duangua = require("./commands/duangua");
       const daga = require("./commands/daga");
+      const daoham = require("./commands/daoham");
 
       if (interaction.customId.startsWith("taixiu_modal_") && taixiu.handleModal)
         return await taixiu.handleModal(interaction);
@@ -135,6 +140,10 @@ client.on(Events.InteractionCreate, async interaction => {
 
       if (interaction.customId.startsWith("daga_modal_") && daga.handleModal)
         return await daga.handleModal(interaction);
+
+      if (interaction.customId.startsWith("daoham_modal_") && daoham.handleModal)
+        return await daoham.handleModal(interaction);
+      
     }
   } catch (error) {
     console.error("❌ Interaction error:", error);
