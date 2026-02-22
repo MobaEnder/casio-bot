@@ -141,7 +141,7 @@ client.on(Events.InteractionCreate, async interaction => {
       if (interaction.customId.startsWith("daga_modal_") && daga.handleModal)
         return await daga.handleModal(interaction);
 
-      if (interaction.customId.startsWith("daoham_modal_") && daoham.handleModal)
+      if (interaction.customId.startsWith("daoham") && daoham.handleModal)
         return await daoham.handleModal(interaction);
       
     }
