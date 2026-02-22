@@ -97,7 +97,7 @@ client.on(Events.InteractionCreate, async interaction => {
       const duangua = require("./commands/duangua");
       const daga = require("./commands/daga");
       const reset = require("./commands/reset");
-      const reset = require("./commands/daoham");
+      const daoham = require("./commands/daoham");
 
       if (interaction.customId.startsWith("taixiu_") && taixiu.handleButton)
         return await taixiu.handleButton(interaction);
