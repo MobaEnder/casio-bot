@@ -317,15 +317,23 @@ if (
         return interaction.reply({ content: "❌ Bạn chưa có pet!", flags: 64 });
 
       const p = user.pet;
-      const key = p.type;
-      const stage = getPetStage(key, p.level);
+const key = p.type;
 
-      const embed = new EmbedBuilder()
-        .setTitle(`🐲 ${p.name}`)
-        .setThumbnail(stage.image)
-        .setDescription(
-          `🌟 Hệ: ${p.element}\n` +
-          `✨ Buff: ${PET_TYPES[key].buff}\n\n` +
+if (!PET_TYPES[key]) {
+  return interaction.reply({
+    content: "❌ Pet bị lỗi dữ liệu (type không hợp lệ).",
+    flags: 64,
+  });
+}
+
+const stage = getPetStage(key, p.level);
+
+const embed = new EmbedBuilder()
+  .setTitle(`🐲 ${p.name}`)
+  .setThumbnail(stage?.image || null)
+  .setDescription(
+    `🌟 Hệ: ${p.element}\n` +
+    `✨ Buff: ${PET_TYPES[key].buff}\n\n` +
           `📊 Level: ${p.level}\n` +
           `🔥 EXP: ${p.exp}/${p.expNeeded}\n` +
           createExpBar(p.exp, p.expNeeded)
