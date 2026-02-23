@@ -198,10 +198,11 @@ module.exports = {
         components: row ? [row] : [],
       });
 
-      // ⏳ Tự xoá nút sau 30s
+      // ⏳ Tự xoá toàn bộ tin nhắn sau 30s
       setTimeout(async () => {
         try {
-          await interaction.message.edit({ components: [] });
+          await interaction.message.delete();
+          games.delete(interaction.message.id); // xoá luôn khỏi memory
         } catch (err) {}
       }, 30000);
     }
