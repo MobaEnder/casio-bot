@@ -98,7 +98,7 @@ module.exports = {
           `💸 Tổng tiền: **${totalCost.toLocaleString("vi-VN")} VND**\n\n` +
           `👉 Nhấn nút bên dưới để mở túi!`
       )
-      .setFooter({ text: "HOP-BOT Casino 💎" })
+      .setFooter({ text: "BOT Casino 💎" })
       .setTimestamp();
 
     const row = new ActionRowBuilder().addComponents(
@@ -180,7 +180,7 @@ module.exports = {
               "vi-VN"
             )} VND**`
         )
-        .setFooter({ text: "HOP-BOT Casino 💎" })
+        .setFooter({ text: "BOT Casino 💎" })
         .setTimestamp();
 
       const row =
@@ -221,7 +221,7 @@ module.exports = {
               "vi-VN"
             )} VND**`
         )
-        .setFooter({ text: "HOP-BOT Casino 💎" })
+        .setFooter({ text: "BOT Casino 💎" })
         .setTimestamp();
 
       await interaction.update({ embeds: [embed] });
