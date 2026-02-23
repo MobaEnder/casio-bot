@@ -13,7 +13,6 @@ const User = require("../models/User");
 
 const PRICE_PER_BAG = 10000;
 const MAX_BAGS = 100;
-const WIN_PERCENT = 40; // 40% trúng = 60% xịt
 
 const games = new Map();
 
@@ -80,9 +79,7 @@ module.exports = {
 
     if (user.money < totalCost) {
       return interaction.reply({
-        content: `❌ Bạn không đủ tiền! Cần ${totalCost.toLocaleString(
-          "vi-VN"
-        )} VND`,
+        content: `❌ Bạn không đủ tiền! Cần ${totalCost.toLocaleString("vi-VN")} VND`,
         ephemeral: true,
       });
     }
@@ -95,8 +92,8 @@ module.exports = {
       .setTitle("🎁 TÚI MÙ MAY MẮN")
       .setDescription(
         `🛍️ Bạn đã mua **${amount} túi**\n` +
-          `💸 Tổng tiền: **${totalCost.toLocaleString("vi-VN")} VND**\n\n` +
-          `👉 Nhấn nút bên dưới để mở túi!`
+        `💸 Tổng tiền: **${totalCost.toLocaleString("vi-VN")} VND**\n\n` +
+        `👉 Nhấn nút bên dưới để mở túi!`
       )
       .setFooter({ text: "BOT Casino 💎" })
       .setTimestamp();
@@ -125,7 +122,6 @@ module.exports = {
     const game = games.get(interaction.message.id);
     if (!game) return;
 
-    // 🎁 MỞ TÚI
     if (interaction.customId === "tuimu_open") {
       if (interaction.user.id !== game.userId) {
         return interaction.reply({
@@ -141,10 +137,23 @@ module.exports = {
       let totalReward = 0;
 
       for (let i = 1; i <= game.amount; i++) {
-        const win =
-          Math.floor(Math.random() * 100) < WIN_PERCENT;
 
-        if (win) {
+        // 🔥 TÍNH TỈ LỆ XỊT THEO TẦNG
+        let losePercent;
+
+        if (i <= 10) {
+          losePercent = Math.floor(Math.random() * (7 - 1 + 1)) + 1; // 1% - 7%
+        } else if (i <= 20) {
+          losePercent = Math.floor(Math.random() * (16 - 7 + 1)) + 7; // 7% - 16%
+        } else if (i <= 36) {
+          losePercent = Math.floor(Math.random() * (20 - 16 + 1)) + 16; // 16% - 20%
+        } else {
+          losePercent = 20; // cố định 20% nếu >36
+        }
+
+        const lose = Math.floor(Math.random() * 100) < losePercent;
+
+        if (!lose) {
           const reward = Math.floor(
             Math.random() * (100000 - 5000 + 1) + 5000
           );
@@ -174,10 +183,8 @@ module.exports = {
         )
         .setDescription(
           `${page1}\n\n` +
-            `💰 Tổng nhận: **${totalReward.toLocaleString("vi-VN")} VND**\n` +
-            `📊 Lãi/Lỗ: **${profit >= 0 ? "+" : ""}${profit.toLocaleString(
-              "vi-VN"
-            )} VND**`
+          `💰 Tổng nhận: **${totalReward.toLocaleString("vi-VN")} VND**\n` +
+          `📊 Lãi/Lỗ: **${profit >= 0 ? "+" : ""}${profit.toLocaleString("vi-VN")} VND**`
         )
         .setFooter({ text: "BOT Casino 💎" })
         .setTimestamp();
@@ -207,7 +214,6 @@ module.exports = {
       }, 30000);
     }
 
-    // 📖 TRANG 2
     if (interaction.customId === "tuimu_page2") {
       const page2 = game.results.slice(50, 100).join("\n");
 
@@ -216,10 +222,8 @@ module.exports = {
         .setTitle("🎊 KẾT QUẢ MỞ TÚI (Trang 2/2)")
         .setDescription(
           `${page2}\n\n` +
-            `💰 Tổng nhận: **${game.totalReward.toLocaleString("vi-VN")} VND**\n` +
-            `📊 Lãi/Lỗ: **${game.profit >= 0 ? "+" : ""}${game.profit.toLocaleString(
-              "vi-VN"
-            )} VND**`
+          `💰 Tổng nhận: **${game.totalReward.toLocaleString("vi-VN")} VND**\n` +
+          `📊 Lãi/Lỗ: **${game.profit >= 0 ? "+" : ""}${game.profit.toLocaleString("vi-VN")} VND**`
         )
         .setFooter({ text: "BOT Casino 💎" })
         .setTimestamp();
