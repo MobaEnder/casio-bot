@@ -54,14 +54,14 @@ const PET_EVOLUTION = {
     { level: 60, image: "https://static.wikia.nocookie.net/dragoncity/images/0/0b/Heat_Dragon_3.png/revision/latest?cb=20150914144946" },
   ],
   water: [
-    { level: 1, image: "https://link-water-lv1.png" },
-    { level: 30, image: "https://link-water-lv30.png" },
-    { level: 60, image: "https://link-water-lv60.png" },
+    { level: 1, image: "https://static.wikia.nocookie.net/dragoncity/images/a/ad/Waterfall_Dragon_1.png/revision/latest?cb=20250117154515" },
+    { level: 30, image: "https://static.wikia.nocookie.net/dragoncity/images/6/6d/Waterfall_Dragon_2.png/revision/latest?cb=20250117154543" },
+    { level: 60, image: "https://static.wikia.nocookie.net/dragoncity/images/a/a2/Waterfall_Dragon_3.png/revision/latest?cb=20250117154630" },
   ],
   electric: [
-    { level: 1, image: "https://link-electric-lv1.png" },
-    { level: 30, image: "https://link-electric-lv30.png" },
-    { level: 60, image: "https://link-electric-lv60.png" },
+    { level: 1, image: "https://static.wikia.nocookie.net/dragoncity/images/a/ad/Electric_Dragon_1.png/revision/latest?cb=20250120094618" },
+    { level: 30, image: "https://static.wikia.nocookie.net/dragoncity/images/5/5a/Electric_Dragon_2.png/revision/latest?cb=20250120094651" },
+    { level: 60, image: "https://static.wikia.nocookie.net/dragoncity/images/f/f0/Electric_Dragon_3.png/revision/latest?cb=20250120094737" },
   ],
 };
 
