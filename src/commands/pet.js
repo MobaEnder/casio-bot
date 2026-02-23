@@ -3,270 +3,338 @@ const {
   EmbedBuilder,
   ActionRowBuilder,
   ButtonBuilder,
-  ButtonStyle
+  ButtonStyle,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
 } = require("discord.js");
 
-const mongoose = require("mongoose");
+const User = require("../models/User");
+const PetShop = require("../models/PetShop");
 
-//////////////////////////////////////////////////
-// ===== MONGOOSE MODEL =====
-//////////////////////////////////////////////////
-
-const petSchema = new mongoose.Schema({
-  userId: String,
-  pet: String,
-  exp: { type: Number, default: 0 },
-  coins: { type: Number, default: 5000 }
-});
-
-const Pet = mongoose.models.Pet || mongoose.model("Pet", petSchema);
-
-//////////////////////////////////////////////////
-// ===== PET DATA =====
-//////////////////////////////////////////////////
+//////////////////////////////////////////////////////
+// 🔥 PET CONFIG (BUFF RIÊNG KHÔNG TRÙNG)
+//////////////////////////////////////////////////////
 
 const PET_TYPES = {
-  fire: { name: "🔥 Fire", buff: "+10% ATK | 5% Crit" },
-  water: { name: "💧 Water", buff: "+15% HP | +10% DEF" },
-  electric: { name: "⚡ Electric", buff: "+15% SPD | 10% Dodge" }
+  fire: {
+    id: "fire_dragon",
+    race: "Dragon",
+    element: "🔥 Lửa",
+    buff: "+15% ATK",
+    baseStats: { hp: 100, atk: 25, def: 10, spd: 15 },
+    growth: { hp: 8, atk: 5, def: 2, spd: 2 },
+  },
+  water: {
+    id: "water_dragon",
+    race: "Dragon",
+    element: "💧 Nước",
+    buff: "+20% HP",
+    baseStats: { hp: 140, atk: 18, def: 20, spd: 10 },
+    growth: { hp: 12, atk: 3, def: 4, spd: 1 },
+  },
+  electric: {
+    id: "electric_dragon",
+    race: "Dragon",
+    element: "⚡ Điện",
+    buff: "+20% SPD",
+    baseStats: { hp: 90, atk: 20, def: 10, spd: 28 },
+    growth: { hp: 7, atk: 4, def: 2, spd: 5 },
+  },
 };
 
-function getLevel(exp) {
-  return Math.floor(exp / 1000) + 1;
+//////////////////////////////////////////////////////
+// 📈 EXP FORMULA
+//////////////////////////////////////////////////////
+
+function expFormula(level) {
+  return 200 + level * level * 50;
 }
 
-function expBar(exp) {
-  const current = exp % 1000;
-  const percent = Math.floor((current / 1000) * 10);
-  return "█".repeat(percent) + "░".repeat(10 - percent);
-}
+//////////////////////////////////////////////////////
+// 🏪 RANDOM SHOP RESET 1H
+//////////////////////////////////////////////////////
 
-function embedColor(level) {
-  if (level >= 90) return 0xFFD700;
-  if (level >= 60) return 0x9B59B6;
-  if (level >= 30) return 0x3498DB;
-  return 0x2ECC71;
-}
+const SHOP_ITEMS = [
+  { name: "Cỏ Ánh Sáng", price: 1_000_000, exp: 300 },
+  { name: "Trái Ma Thuật", price: 2_000_000, exp: 600 },
+  { name: "Tinh Thạch", price: 5_000_000, exp: 1500 },
+  { name: "Lõi Thú", price: 10_000_000, exp: 3000 },
+  { name: "Ngọc Hỏa", price: 20_000_000, exp: 6000 },
+  { name: "Tim Rồng", price: 50_000_000, exp: 15000 },
+];
 
-//////////////////////////////////////////////////
-// ===== SHARED SHOP (RAM MEMORY) =====
-//////////////////////////////////////////////////
+async function getShop() {
+  let shop = await PetShop.findOne();
 
-let shop = null;
-
-function generateShop() {
-  const items = [];
-  for (let i = 1; i <= 6; i++) {
-    items.push({
-      id: i,
-      name: `Item ${i}`,
-      price: 500 + Math.floor(Math.random() * 500),
-      exp: 200 + Math.floor(Math.random() * 300),
-      stock: Math.random() > 0.5 ? 2 : 3
+  if (!shop) {
+    shop = await PetShop.create({
+      items: [],
+      lastReset: new Date(0),
     });
   }
 
-  shop = {
-    items,
-    reset: Date.now() + 3600000
-  };
-}
+  const now = Date.now();
+  const diff = now - shop.lastReset.getTime();
 
-function getShop() {
-  if (!shop || Date.now() > shop.reset) {
-    generateShop();
+  if (diff > 60 * 60 * 1000) {
+    shop.items = SHOP_ITEMS.sort(() => 0.5 - Math.random()).slice(0, 6);
+    shop.lastReset = new Date();
+    await shop.save();
   }
+
   return shop;
 }
 
-//////////////////////////////////////////////////
-// ===== COMMAND EXPORT =====
-//////////////////////////////////////////////////
+//////////////////////////////////////////////////////
+// 🎮 COMMAND
+//////////////////////////////////////////////////////
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName("pet")
-    .setDescription("Hệ thống pet")
-    .addSubcommand(s =>
-      s.setName("chon").setDescription("Chọn pet")
-    )
-    .addSubcommand(s =>
-      s.setName("balo")
-        .setDescription("Xem balo")
-        .addUserOption(o =>
-          o.setName("user").setDescription("Xem người khác")
-        )
-    )
-    .addSubcommand(s =>
-      s.setName("shop").setDescription("Xem shop")
-    ),
-
-  //////////////////////////////////////////////////
-  // EXECUTE
-  //////////////////////////////////////////////////
+    .setName("thucung")
+    .setDescription("Hệ thống thú cưng"),
 
   async execute(interaction) {
 
-    const sub = interaction.options.getSubcommand();
+    const embed = new EmbedBuilder()
+      .setTitle("🐲 Hệ thống Thú Cưng")
+      .setDescription("Chọn hành động bên dưới");
 
-    // ===== CHỌN PET =====
-    if (sub === "chon") {
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId("pet_choose")
+        .setLabel("🥚 Chọn Pet")
+        .setStyle(ButtonStyle.Primary),
 
-      const exist = await Pet.findOne({ userId: interaction.user.id });
-      if (exist)
-        return interaction.reply({ content: "Bạn đã có pet rồi!", flags: 64 });
+      new ButtonBuilder()
+        .setCustomId("pet_bag")
+        .setLabel("🎒 Balo")
+        .setStyle(ButtonStyle.Success),
 
-      const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId("pet_choose_fire")
-          .setLabel("🔥 Fire")
-          .setStyle(ButtonStyle.Danger),
+      new ButtonBuilder()
+        .setCustomId("pet_shop")
+        .setLabel("🏪 Shop")
+        .setStyle(ButtonStyle.Secondary)
+    );
 
-        new ButtonBuilder()
-          .setCustomId("pet_choose_water")
-          .setLabel("💧 Water")
-          .setStyle(ButtonStyle.Primary),
+    const msg = await interaction.reply({
+      embeds: [embed],
+      components: [row],
+      fetchReply: true,
+    });
 
-        new ButtonBuilder()
-          .setCustomId("pet_choose_electric")
-          .setLabel("⚡ Electric")
-          .setStyle(ButtonStyle.Success)
-      );
-
-      await interaction.reply({
-        content: "Chọn hệ pet:",
-        components: [row]
-      });
-
-      setTimeout(() => interaction.deleteReply().catch(() => {}), 60000);
-    }
-
-    // ===== BALO =====
-    if (sub === "balo") {
-
-      const target =
-        interaction.options.getUser("user") || interaction.user;
-
-      const user = await Pet.findOne({ userId: target.id });
-      if (!user)
-        return interaction.reply({ content: "Người này chưa có pet!", flags: 64 });
-
-      const level = getLevel(user.exp);
-
-      const embed = new EmbedBuilder()
-        .setTitle(`Balo của ${target.username}`)
-        .setColor(embedColor(level))
-        .addFields(
-          { name: "Hệ", value: PET_TYPES[user.pet].name },
-          { name: "Buff", value: PET_TYPES[user.pet].buff },
-          { name: "Level", value: level.toString() },
-          { name: "EXP", value: `${user.exp}\n${expBar(user.exp)}` },
-          { name: "Coins", value: user.coins.toString() }
-        );
-
-      await interaction.reply({ embeds: [embed] });
-      setTimeout(() => interaction.deleteReply().catch(() => {}), 60000);
-    }
-
-    // ===== SHOP =====
-    if (sub === "shop") {
-
-      const currentShop = getShop();
-
-      const embed = new EmbedBuilder()
-        .setTitle("🏪 SHOP CHUNG")
-        .setColor(0xF1C40F);
-
-      currentShop.items.forEach(i => {
-        embed.addFields({
-          name: `${i.id}. ${i.name} (x${i.stock})`,
-          value: `Giá: ${i.price} | EXP: +${i.exp}`
-        });
-      });
-
-      const row = new ActionRowBuilder();
-
-      currentShop.items.forEach(i => {
-        row.addComponents(
-          new ButtonBuilder()
-            .setCustomId(`pet_buy_${i.id}`)
-            .setLabel(`Mua ${i.id}`)
-            .setStyle(ButtonStyle.Secondary)
-            .setDisabled(i.stock <= 0)
-        );
-      });
-
-      await interaction.reply({
-        embeds: [embed],
-        components: [row]
-      });
-
-      setTimeout(() => interaction.deleteReply().catch(() => {}), 60000);
-    }
+    setTimeout(() => msg.delete().catch(() => {}), 60000);
   },
 
-  //////////////////////////////////////////////////
-  // HANDLE BUTTON
-  //////////////////////////////////////////////////
+  //////////////////////////////////////////////////////
+  // BUTTON
+  //////////////////////////////////////////////////////
 
   async handleButton(interaction) {
 
-    // ===== CHOOSE =====
-    if (interaction.customId.startsWith("pet_choose_")) {
+    let user = await User.findOne({ userId: interaction.user.id });
+    if (!user) user = await User.create({ userId: interaction.user.id });
 
-      const type = interaction.customId.split("_")[2];
+    ////////////////////////////////////////////////////
+    // CHỌN PET (FIX CHỌN 1 LẦN)
+    ////////////////////////////////////////////////////
 
-      const exist = await Pet.findOne({ userId: interaction.user.id });
-      if (exist)
-        return interaction.reply({ content: "Bạn đã có pet rồi!", flags: 64 });
+    if (interaction.customId === "pet_choose") {
 
-      await Pet.create({
-        userId: interaction.user.id,
-        pet: type
+      if (user.pet) {
+        return interaction.reply({
+          content: "❌ Bạn đã có pet rồi!",
+          flags: 64,
+        });
+      }
+
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId("pet_fire")
+          .setLabel("🔥 Rồng Lửa")
+          .setStyle(ButtonStyle.Danger),
+
+        new ButtonBuilder()
+          .setCustomId("pet_water")
+          .setLabel("💧 Rồng Nước")
+          .setStyle(ButtonStyle.Primary),
+
+        new ButtonBuilder()
+          .setCustomId("pet_electric")
+          .setLabel("⚡ Rồng Điện")
+          .setStyle(ButtonStyle.Success)
+      );
+
+      const msg = await interaction.reply({
+        content: "Chọn 1 loại pet:",
+        components: [row],
+        fetchReply: true,
       });
 
-      await interaction.update({
-        content: `Bạn đã chọn hệ ${PET_TYPES[type].name}`,
-        components: []
-      });
+      setTimeout(() => msg.delete().catch(() => {}), 60000);
+      return;
     }
 
-    // ===== BUY =====
+    ////////////////////////////////////////////////////
+    // MUA SHOP (THÊM NÚT)
+    ////////////////////////////////////////////////////
+
+    if (interaction.customId === "pet_shop") {
+
+      const shop = await getShop();
+
+      const embed = new EmbedBuilder()
+        .setTitle("🏪 Pet Shop");
+
+      const row = new ActionRowBuilder();
+
+      shop.items.forEach((item, i) => {
+
+        embed.addFields({
+          name: `${i + 1}. ${item.name}`,
+          value: `💰 ${item.price.toLocaleString()} | EXP +${item.exp}`
+        });
+
+        row.addComponents(
+          new ButtonBuilder()
+            .setCustomId(`pet_buy_${i}`)
+            .setLabel(`Mua ${i + 1}`)
+            .setStyle(ButtonStyle.Secondary)
+        );
+      });
+
+      const msg = await interaction.reply({
+        embeds: [embed],
+        components: [row],
+        fetchReply: true,
+      });
+
+      setTimeout(() => msg.delete().catch(() => {}), 60000);
+      return;
+    }
+
+    ////////////////////////////////////////////////////
+    // BUY ITEM
+    ////////////////////////////////////////////////////
+
     if (interaction.customId.startsWith("pet_buy_")) {
 
-      const id = Number(interaction.customId.split("_")[2]);
-      const currentShop = getShop();
-      const item = currentShop.items.find(i => i.id === id);
+      const index = Number(interaction.customId.split("_")[2]);
+      const shop = await getShop();
+      const item = shop.items[index];
 
-      if (!item || item.stock <= 0)
-        return interaction.reply({ content: "Hết hàng!", flags: 64 });
+      if (!user.pet)
+        return interaction.reply({ content: "❌ Bạn chưa có pet!", flags: 64 });
 
-      const user = await Pet.findOne({ userId: interaction.user.id });
-      if (!user)
-        return interaction.reply({ content: "Bạn chưa có pet!", flags: 64 });
+      if (user.money < item.price)
+        return interaction.reply({ content: "❌ Không đủ tiền!", flags: 64 });
 
-      if (user.coins < item.price)
-        return interaction.reply({ content: "Không đủ tiền!", flags: 64 });
+      user.money -= item.price;
+      user.pet.exp += item.exp;
 
-      user.coins -= item.price;
-      user.exp += item.exp;
-      item.stock--;
+      while (user.pet.exp >= user.pet.expNeeded) {
+        user.pet.exp -= user.pet.expNeeded;
+        user.pet.level++;
+        user.pet.expNeeded = expFormula(user.pet.level);
+
+        const growth = PET_TYPES[user.pet.element.replace("🔥 ","").replace("💧 ","").replace("⚡ ","").toLowerCase()]?.growth;
+
+        if (growth) {
+          user.pet.stats.hp += growth.hp;
+          user.pet.stats.atk += growth.atk;
+          user.pet.stats.def += growth.def;
+          user.pet.stats.spd += growth.spd;
+        }
+      }
 
       await user.save();
 
-      const level = getLevel(user.exp);
-
-      await interaction.reply({
-        content: `Mua thành công! +${item.exp} EXP`
+      const msg = await interaction.reply({
+        content: `✅ Mua thành công +${item.exp} EXP`,
+        fetchReply: true,
       });
 
-      if ([30, 60, 90].includes(level)) {
-        interaction.channel.send(
-          `🔥 ${interaction.user.username} đã đạt level ${level}!`
-        );
-      }
-
-      setTimeout(() => interaction.deleteReply().catch(() => {}), 60000);
+      setTimeout(() => msg.delete().catch(() => {}), 60000);
+      return;
     }
-  }
+
+    ////////////////////////////////////////////////////
+    // BALO (PUBLIC)
+    ////////////////////////////////////////////////////
+
+    if (interaction.customId === "pet_bag") {
+
+      if (!user.pet)
+        return interaction.reply({ content: "❌ Bạn chưa có pet!", flags: 64 });
+
+      const p = user.pet;
+
+      const embed = new EmbedBuilder()
+        .setTitle(`🐲 ${p.name}`)
+        .setDescription(
+          `Hệ: ${p.element}\nBuff: ${PET_TYPES[p.element.replace("🔥 ","").replace("💧 ","").replace("⚡ ","").toLowerCase()].buff}`
+        )
+        .addFields(
+          { name: "Level", value: `${p.level}`, inline: true },
+          { name: "EXP", value: `${p.exp}/${p.expNeeded}`, inline: true },
+          { name: "HP", value: `${p.stats.hp}`, inline: true },
+          { name: "ATK", value: `${p.stats.atk}`, inline: true },
+          { name: "DEF", value: `${p.stats.def}`, inline: true },
+          { name: "SPD", value: `${p.stats.spd}`, inline: true }
+        );
+
+      const msg = await interaction.reply({
+        embeds: [embed],
+        fetchReply: true,
+      });
+
+      setTimeout(() => msg.delete().catch(() => {}), 60000);
+      return;
+    }
+  },
+
+  //////////////////////////////////////////////////////
+  // MODAL (FIX CHẶN CHỌN NHIỀU PET)
+  //////////////////////////////////////////////////////
+
+  async handleModal(interaction) {
+
+    if (!interaction.customId.startsWith("pet_name_")) return;
+
+    let user = await User.findOne({ userId: interaction.user.id });
+    if (!user) user = await User.create({ userId: interaction.user.id });
+
+    if (user.pet)
+      return interaction.reply({
+        content: "❌ Bạn đã có pet rồi!",
+        flags: 64,
+      });
+
+    const type = interaction.customId.split("_")[2];
+    const name = interaction.fields.getTextInputValue("pet_name_input");
+
+    const config = PET_TYPES[type];
+
+    user.pet = {
+      id: config.id,
+      name,
+      element: config.element,
+      race: config.race,
+      level: 1,
+      exp: 0,
+      expNeeded: expFormula(1),
+      stats: config.baseStats,
+      createdAt: new Date(),
+    };
+
+    await user.save();
+
+    const msg = await interaction.reply({
+      content: `🎉 Bạn đã nhận pet **${name}** (${config.element})`,
+      fetchReply: true,
+    });
+
+    setTimeout(() => msg.delete().catch(() => {}), 60000);
+  },
 };
