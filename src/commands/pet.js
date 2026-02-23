@@ -364,7 +364,7 @@ if (!PET_TYPES[key]) {
 
   const embed = new EmbedBuilder()
     .setTitle(`🐲 ${p.name}`)
-    .setThumbnail(stage?.image || null)
+    .setThumbnail(stage?.image || stage?.imageUrl || PET_TYPES[key]?.image || null)
     .setDescription(
       `🌟 Hệ: ${p.element}\n` +
       `✨ Buff: ${PET_TYPES[key].buff}\n\n` +
