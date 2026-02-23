@@ -1,279 +1,272 @@
 const {
+  SlashCommandBuilder,
   EmbedBuilder,
   ActionRowBuilder,
   ButtonBuilder,
-  ButtonStyle,
-  SlashCommandBuilder,
-  Routes
+  ButtonStyle
 } = require("discord.js");
 
-const { REST } = require("@discordjs/rest");
-const { QuickDB } = require("quick.db");
-const db = new QuickDB();
+const mongoose = require("mongoose");
 
-module.exports = (client) => {
+//////////////////////////////////////////////////
+// ===== MONGOOSE MODEL =====
+//////////////////////////////////////////////////
 
-  const TOKEN = "BOT_TOKEN";
-  const CLIENT_ID = "CLIENT_ID";
+const petSchema = new mongoose.Schema({
+  userId: String,
+  pet: String,
+  exp: { type: Number, default: 0 },
+  coins: { type: Number, default: 5000 }
+});
 
-  //////////////////////////////
-  // ===== PET DATA =====
-  //////////////////////////////
+const Pet = mongoose.models.Pet || mongoose.model("Pet", petSchema);
 
-  const PET_TYPES = {
-    fire: { name: "🔥 Fire", buff: "+10% ATK | 5% Crit" },
-    water: { name: "💧 Water", buff: "+15% HP | +10% DEF" },
-    electric: { name: "⚡ Electric", buff: "+15% SPD | 10% Dodge" }
-  };
+//////////////////////////////////////////////////
+// ===== PET DATA =====
+//////////////////////////////////////////////////
 
-  function getLevel(exp) {
-    return Math.floor(exp / 1000) + 1;
-  }
+const PET_TYPES = {
+  fire: { name: "🔥 Fire", buff: "+10% ATK | 5% Crit" },
+  water: { name: "💧 Water", buff: "+15% HP | +10% DEF" },
+  electric: { name: "⚡ Electric", buff: "+15% SPD | 10% Dodge" }
+};
 
-  function expBar(exp) {
-    const current = exp % 1000;
-    const percent = Math.floor((current / 1000) * 10);
-    return "█".repeat(percent) + "░".repeat(10 - percent);
-  }
+function getLevel(exp) {
+  return Math.floor(exp / 1000) + 1;
+}
 
-  function embedColor(level) {
-    if (level >= 90) return 0xFFD700;
-    if (level >= 60) return 0x9B59B6;
-    if (level >= 30) return 0x3498DB;
-    return 0x2ECC71;
-  }
+function expBar(exp) {
+  const current = exp % 1000;
+  const percent = Math.floor((current / 1000) * 10);
+  return "█".repeat(percent) + "░".repeat(10 - percent);
+}
 
-  //////////////////////////////
-  // ===== SHARED SHOP =====
-  //////////////////////////////
+function embedColor(level) {
+  if (level >= 90) return 0xFFD700;
+  if (level >= 60) return 0x9B59B6;
+  if (level >= 30) return 0x3498DB;
+  return 0x2ECC71;
+}
 
-  async function generateShop() {
-    const items = [];
-    for (let i = 1; i <= 6; i++) {
-      items.push({
-        id: i,
-        name: `Item ${i}`,
-        price: 500 + Math.floor(Math.random() * 500),
-        exp: 200 + Math.floor(Math.random() * 300),
-        stock: Math.random() > 0.5 ? 2 : 3
-      });
-    }
+//////////////////////////////////////////////////
+// ===== SHARED SHOP (RAM MEMORY) =====
+//////////////////////////////////////////////////
 
-    await db.set("shop", {
-      items,
-      reset: Date.now() + 3600000
+let shop = null;
+
+function generateShop() {
+  const items = [];
+  for (let i = 1; i <= 6; i++) {
+    items.push({
+      id: i,
+      name: `Item ${i}`,
+      price: 500 + Math.floor(Math.random() * 500),
+      exp: 200 + Math.floor(Math.random() * 300),
+      stock: Math.random() > 0.5 ? 2 : 3
     });
   }
 
-  async function getShop() {
-    let shop = await db.get("shop");
-    if (!shop || Date.now() > shop.reset) {
-      await generateShop();
-      shop = await db.get("shop");
-    }
-    return shop;
+  shop = {
+    items,
+    reset: Date.now() + 3600000
+  };
+}
+
+function getShop() {
+  if (!shop || Date.now() > shop.reset) {
+    generateShop();
   }
+  return shop;
+}
 
-  //////////////////////////////
-  // ===== REGISTER COMMANDS =====
-  //////////////////////////////
+//////////////////////////////////////////////////
+// ===== COMMAND EXPORT =====
+//////////////////////////////////////////////////
 
-  const commands = [
-    new SlashCommandBuilder()
-      .setName("pet")
-      .setDescription("Chọn pet của bạn"),
+module.exports = {
+  data: new SlashCommandBuilder()
+    .setName("pet")
+    .setDescription("Hệ thống pet")
+    .addSubcommand(s =>
+      s.setName("chon").setDescription("Chọn pet")
+    )
+    .addSubcommand(s =>
+      s.setName("balo")
+        .setDescription("Xem balo")
+        .addUserOption(o =>
+          o.setName("user").setDescription("Xem người khác")
+        )
+    )
+    .addSubcommand(s =>
+      s.setName("shop").setDescription("Xem shop")
+    ),
 
-    new SlashCommandBuilder()
-      .setName("balo")
-      .setDescription("Xem balo")
-      .addUserOption(o =>
-        o.setName("user")
-          .setDescription("Xem balo người khác")
-      ),
+  //////////////////////////////////////////////////
+  // EXECUTE
+  //////////////////////////////////////////////////
 
-    new SlashCommandBuilder()
-      .setName("shop")
-      .setDescription("Xem shop chung")
-  ];
+  async execute(interaction) {
 
-  const rest = new REST({ version: "10" }).setToken(TOKEN);
+    const sub = interaction.options.getSubcommand();
 
-  client.once("ready", async () => {
-    await rest.put(
-      Routes.applicationCommands(CLIENT_ID),
-      { body: commands }
-    );
-    console.log("✅ Pet system ready");
-  });
+    // ===== CHỌN PET =====
+    if (sub === "chon") {
 
-  //////////////////////////////
-  // ===== INTERACTION HANDLE =====
-  //////////////////////////////
+      const exist = await Pet.findOne({ userId: interaction.user.id });
+      if (exist)
+        return interaction.reply({ content: "Bạn đã có pet rồi!", flags: 64 });
 
-  client.on("interactionCreate", async interaction => {
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId("pet_choose_fire")
+          .setLabel("🔥 Fire")
+          .setStyle(ButtonStyle.Danger),
 
-    //////////////////////////////
-    // ===== SLASH COMMANDS =====
-    //////////////////////////////
+        new ButtonBuilder()
+          .setCustomId("pet_choose_water")
+          .setLabel("💧 Water")
+          .setStyle(ButtonStyle.Primary),
 
-    if (interaction.isChatInputCommand()) {
+        new ButtonBuilder()
+          .setCustomId("pet_choose_electric")
+          .setLabel("⚡ Electric")
+          .setStyle(ButtonStyle.Success)
+      );
 
-      // PET
-      if (interaction.commandName === "pet") {
-        const user = await db.get(`user_${interaction.user.id}`);
-        if (user?.pet)
-          return interaction.reply({ content: "Bạn đã có pet rồi!", ephemeral: true });
+      await interaction.reply({
+        content: "Chọn hệ pet:",
+        components: [row]
+      });
 
-        const row = new ActionRowBuilder().addComponents(
-          new ButtonBuilder()
-            .setCustomId("choose_fire")
-            .setLabel("🔥 Fire")
-            .setStyle(ButtonStyle.Danger),
+      setTimeout(() => interaction.deleteReply().catch(() => {}), 60000);
+    }
 
-          new ButtonBuilder()
-            .setCustomId("choose_water")
-            .setLabel("💧 Water")
-            .setStyle(ButtonStyle.Primary),
+    // ===== BALO =====
+    if (sub === "balo") {
 
-          new ButtonBuilder()
-            .setCustomId("choose_electric")
-            .setLabel("⚡ Electric")
-            .setStyle(ButtonStyle.Success)
+      const target =
+        interaction.options.getUser("user") || interaction.user;
+
+      const user = await Pet.findOne({ userId: target.id });
+      if (!user)
+        return interaction.reply({ content: "Người này chưa có pet!", flags: 64 });
+
+      const level = getLevel(user.exp);
+
+      const embed = new EmbedBuilder()
+        .setTitle(`Balo của ${target.username}`)
+        .setColor(embedColor(level))
+        .addFields(
+          { name: "Hệ", value: PET_TYPES[user.pet].name },
+          { name: "Buff", value: PET_TYPES[user.pet].buff },
+          { name: "Level", value: level.toString() },
+          { name: "EXP", value: `${user.exp}\n${expBar(user.exp)}` },
+          { name: "Coins", value: user.coins.toString() }
         );
 
-        await interaction.reply({
-          content: "Chọn hệ pet:",
-          components: [row]
-        });
-
-        setTimeout(() => interaction.deleteReply().catch(() => {}), 60000);
-      }
-
-      // BALO
-      if (interaction.commandName === "balo") {
-        const target = interaction.options.getUser("user") || interaction.user;
-        const user = await db.get(`user_${target.id}`);
-
-        if (!user?.pet)
-          return interaction.reply({ content: "Người này chưa có pet!", ephemeral: true });
-
-        const level = getLevel(user.exp);
-
-        const embed = new EmbedBuilder()
-          .setTitle(`Balo của ${target.username}`)
-          .setColor(embedColor(level))
-          .addFields(
-            { name: "Hệ", value: PET_TYPES[user.pet].name },
-            { name: "Buff", value: PET_TYPES[user.pet].buff },
-            { name: "Level", value: level.toString() },
-            { name: "EXP", value: `${user.exp}\n${expBar(user.exp)}` },
-            { name: "Coins", value: user.coins.toString() }
-          );
-
-        await interaction.reply({ embeds: [embed] });
-        setTimeout(() => interaction.deleteReply().catch(() => {}), 60000);
-      }
-
-      // SHOP
-      if (interaction.commandName === "shop") {
-        const shop = await getShop();
-
-        const embed = new EmbedBuilder()
-          .setTitle("🏪 SHOP CHUNG")
-          .setColor(0xF1C40F);
-
-        shop.items.forEach(i => {
-          embed.addFields({
-            name: `${i.id}. ${i.name} (x${i.stock})`,
-            value: `Giá: ${i.price} | EXP: +${i.exp}`
-          });
-        });
-
-        const row = new ActionRowBuilder();
-
-        shop.items.forEach(i => {
-          row.addComponents(
-            new ButtonBuilder()
-              .setCustomId(`buy_${i.id}`)
-              .setLabel(`Mua ${i.id}`)
-              .setStyle(ButtonStyle.Secondary)
-              .setDisabled(i.stock <= 0)
-          );
-        });
-
-        await interaction.reply({
-          embeds: [embed],
-          components: [row]
-        });
-
-        setTimeout(() => interaction.deleteReply().catch(() => {}), 60000);
-      }
+      await interaction.reply({ embeds: [embed] });
+      setTimeout(() => interaction.deleteReply().catch(() => {}), 60000);
     }
 
-    //////////////////////////////
-    // ===== BUTTON HANDLE =====
-    //////////////////////////////
+    // ===== SHOP =====
+    if (sub === "shop") {
 
-    if (interaction.isButton()) {
+      const currentShop = getShop();
 
-      // CHOOSE PET
-      if (interaction.customId.startsWith("choose_")) {
-        const type = interaction.customId.split("_")[1];
+      const embed = new EmbedBuilder()
+        .setTitle("🏪 SHOP CHUNG")
+        .setColor(0xF1C40F);
 
-        const exist = await db.get(`user_${interaction.user.id}`);
-        if (exist?.pet)
-          return interaction.reply({ content: "Bạn đã có pet rồi!", ephemeral: true });
-
-        await db.set(`user_${interaction.user.id}`, {
-          pet: type,
-          exp: 0,
-          coins: 5000
+      currentShop.items.forEach(i => {
+        embed.addFields({
+          name: `${i.id}. ${i.name} (x${i.stock})`,
+          value: `Giá: ${i.price} | EXP: +${i.exp}`
         });
+      });
 
-        await interaction.update({
-          content: `Bạn đã chọn hệ ${PET_TYPES[type].name}`,
-          components: []
-        });
-      }
+      const row = new ActionRowBuilder();
 
-      // BUY
-      if (interaction.customId.startsWith("buy_")) {
-        const id = Number(interaction.customId.split("_")[1]);
-        const shop = await getShop();
-        const item = shop.items.find(i => i.id === id);
+      currentShop.items.forEach(i => {
+        row.addComponents(
+          new ButtonBuilder()
+            .setCustomId(`pet_buy_${i.id}`)
+            .setLabel(`Mua ${i.id}`)
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(i.stock <= 0)
+        );
+      });
 
-        if (!item || item.stock <= 0)
-          return interaction.reply({ content: "Hết hàng!", ephemeral: true });
+      await interaction.reply({
+        embeds: [embed],
+        components: [row]
+      });
 
-        const user = await db.get(`user_${interaction.user.id}`);
-        if (!user?.pet)
-          return interaction.reply({ content: "Bạn chưa có pet!", ephemeral: true });
-
-        if (user.coins < item.price)
-          return interaction.reply({ content: "Không đủ tiền!", ephemeral: true });
-
-        user.coins -= item.price;
-        user.exp += item.exp;
-        item.stock--;
-
-        await db.set(`user_${interaction.user.id}`, user);
-        await db.set("shop", shop);
-
-        const level = getLevel(user.exp);
-
-        await interaction.reply({
-          content: `Mua thành công! +${item.exp} EXP`
-        });
-
-        // LOG TIẾN HOÁ
-        if ([30, 60, 90].includes(level)) {
-          interaction.channel.send(
-            `🔥 ${interaction.user.username} đã đạt level ${level}!`
-          );
-        }
-
-        setTimeout(() => interaction.deleteReply().catch(() => {}), 60000);
-      }
+      setTimeout(() => interaction.deleteReply().catch(() => {}), 60000);
     }
-  });
+  },
+
+  //////////////////////////////////////////////////
+  // HANDLE BUTTON
+  //////////////////////////////////////////////////
+
+  async handleButton(interaction) {
+
+    // ===== CHOOSE =====
+    if (interaction.customId.startsWith("pet_choose_")) {
+
+      const type = interaction.customId.split("_")[2];
+
+      const exist = await Pet.findOne({ userId: interaction.user.id });
+      if (exist)
+        return interaction.reply({ content: "Bạn đã có pet rồi!", flags: 64 });
+
+      await Pet.create({
+        userId: interaction.user.id,
+        pet: type
+      });
+
+      await interaction.update({
+        content: `Bạn đã chọn hệ ${PET_TYPES[type].name}`,
+        components: []
+      });
+    }
+
+    // ===== BUY =====
+    if (interaction.customId.startsWith("pet_buy_")) {
+
+      const id = Number(interaction.customId.split("_")[2]);
+      const currentShop = getShop();
+      const item = currentShop.items.find(i => i.id === id);
+
+      if (!item || item.stock <= 0)
+        return interaction.reply({ content: "Hết hàng!", flags: 64 });
+
+      const user = await Pet.findOne({ userId: interaction.user.id });
+      if (!user)
+        return interaction.reply({ content: "Bạn chưa có pet!", flags: 64 });
+
+      if (user.coins < item.price)
+        return interaction.reply({ content: "Không đủ tiền!", flags: 64 });
+
+      user.coins -= item.price;
+      user.exp += item.exp;
+      item.stock--;
+
+      await user.save();
+
+      const level = getLevel(user.exp);
+
+      await interaction.reply({
+        content: `Mua thành công! +${item.exp} EXP`
+      });
+
+      if ([30, 60, 90].includes(level)) {
+        interaction.channel.send(
+          `🔥 ${interaction.user.username} đã đạt level ${level}!`
+        );
+      }
+
+      setTimeout(() => interaction.deleteReply().catch(() => {}), 60000);
+    }
+  }
 };
