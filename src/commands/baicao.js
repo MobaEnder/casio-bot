@@ -58,7 +58,7 @@ module.exports = {
         `💰 Cược: ${bet.toLocaleString("vi-VN")} VND\n\n` +
         `👉 Nhấn **Tham Gia** để chơi!`
       )
-      .setFooter({ text: "HOP-BOT Casino 💎" });
+      .setFooter({ text: "BOT Casino 💎" });
 
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
