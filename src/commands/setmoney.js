@@ -8,7 +8,7 @@ const adminIds = process.env.ADMIN_IDS
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("setmoney")
-    .setDescription("💰 Admin: chỉnh sửa tiền người dùng")
+    .setDescription("💰 CHỈNH TIỀN NGƯỜI DÙNG (Admin only)")
     .addUserOption(option =>
       option
         .setName("user")
