@@ -49,7 +49,7 @@ const PET_TYPES = {
 
 const PET_EVOLUTION = {
   fire: [
-    { level: 1, image: "https://link-fire-lv1.png" },
+    { level: 1, image: "https://cdn.discordapp.com/attachments/919941010304417834/1475528361643085894/image.png" },
     { level: 30, image: "https://link-fire-lv30.png" },
     { level: 60, image: "https://link-fire-lv60.png" },
   ],
