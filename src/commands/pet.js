@@ -180,40 +180,52 @@ module.exports = {
     // MUA SHOP (THÊM NÚT)
     ////////////////////////////////////////////////////
 
-    if (interaction.customId === "pet_shop") {
+if (interaction.customId === "pet_shop") {
 
-      const shop = await getShop();
+  const shop = await getShop();
 
-      const embed = new EmbedBuilder()
-        .setTitle("🏪 Pet Shop");
+  const embed = new EmbedBuilder()
+    .setTitle("🏪 Pet Shop")
+    .setDescription("Shop chung toàn server • Reset mỗi 1 giờ");
 
-      const row = new ActionRowBuilder();
+  const rows = [];
+  let currentRow = new ActionRowBuilder();
 
-      shop.items.forEach((item, i) => {
+  shop.items.forEach((item, i) => {
 
-        embed.addFields({
-          name: `${i + 1}. ${item.name}`,
-          value: `💰 ${item.price.toLocaleString()} | EXP +${item.exp}`
-        });
+    embed.addFields({
+      name: `${i + 1}. ${item.name}`,
+      value: `💰 ${item.price.toLocaleString()} | EXP +${item.exp}`
+    });
 
-        row.addComponents(
-          new ButtonBuilder()
-            .setCustomId(`pet_buy_${i}`)
-            .setLabel(`Mua ${i + 1}`)
-            .setStyle(ButtonStyle.Secondary)
-        );
-      });
+    const button = new ButtonBuilder()
+      .setCustomId(`pet_buy_${i}`)
+      .setLabel(`Mua ${i + 1}`)
+      .setStyle(ButtonStyle.Secondary);
 
-      const msg = await interaction.reply({
-        embeds: [embed],
-        components: [row],
-        fetchReply: true,
-      });
-
-      setTimeout(() => msg.delete().catch(() => {}), 60000);
-      return;
+    // nếu đủ 5 button thì tạo row mới
+    if (currentRow.components.length === 5) {
+      rows.push(currentRow);
+      currentRow = new ActionRowBuilder();
     }
 
+    currentRow.addComponents(button);
+  });
+
+  // push row cuối
+  if (currentRow.components.length > 0) {
+    rows.push(currentRow);
+  }
+
+  const msg = await interaction.reply({
+    embeds: [embed],
+    components: rows,
+    fetchReply: true,
+  });
+
+  setTimeout(() => msg.delete().catch(() => {}), 60000);
+  return;
+}
     ////////////////////////////////////////////////////
     // BUY ITEM
     ////////////////////////////////////////////////////
