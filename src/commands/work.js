@@ -85,7 +85,7 @@ module.exports = {
         `💸 **Thu nhập:** ${reward.toLocaleString("vi-VN")} VND\n\n` +
         `😂 ${joke}`
       )
-      .setFooter({ text: "HOP BOT • Work System" })
+      .setFooter({ text: "BOT • Work System" })
       .setTimestamp();
 
     await interaction.reply({ embeds: [embed] });
