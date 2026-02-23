@@ -16,28 +16,30 @@ module.exports = {
     .setDescription("🃏 Tạo phòng bài cào")
     .addIntegerOption(option =>
       option.setName("songuoi")
-        .setDescription("Số người chơi (tối đa 17)")
+        .setDescription("Số người chơi (2–17)")
         .setRequired(true))
     .addIntegerOption(option =>
       option.setName("tien")
-        .setDescription("Tiền cược (tối đa 10.000)")
+        .setDescription("Tiền cược (tối thiểu 10.000)")
         .setRequired(true)),
 
   async execute(interaction) {
     const maxPlayers = interaction.options.getInteger("songuoi");
     const bet = interaction.options.getInteger("tien");
 
+    // Kiểm tra số người
     if (maxPlayers < 2 || maxPlayers > 17) {
       return interaction.reply({
         content: "❌ Số người phải từ 2–17!",
-        flags: 64,
+        ephemeral: true,
       });
     }
 
-    if (bet <= 0 || bet > 10000) {
+    // 🔥 CHỈ GIỚI HẠN TỐI THIỂU 10.000
+    if (bet < 10000) {
       return interaction.reply({
-        content: "❌ Tiền cược tối đa 10.000!",
-        flags: 64,
+        content: "❌ Tiền cược tối thiểu là 10.000 VND!",
+        ephemeral: true,
       });
     }
 
@@ -45,7 +47,7 @@ module.exports = {
     if (!user || user.money < bet) {
       return interaction.reply({
         content: "❌ Bạn không đủ tiền!",
-        flags: 64,
+        ephemeral: true,
       });
     }
 
@@ -70,12 +72,10 @@ module.exports = {
     const msg = await interaction.reply({
       embeds: [embed],
       components: [row],
-      withResponse: true,
+      fetchReply: true,
     });
 
-    const message = msg.resource.message;
-
-    rooms.set(message.id, {
+    rooms.set(msg.id, {
       host: interaction.user.id,
       maxPlayers,
       bet,
@@ -93,7 +93,7 @@ module.exports = {
     if (room.players.has(interaction.user.id)) {
       return interaction.reply({
         content: "❌ Bạn đã tham gia rồi!",
-        flags: 64,
+        ephemeral: true,
       });
     }
 
@@ -101,7 +101,7 @@ module.exports = {
     if (!user || user.money < room.bet) {
       return interaction.reply({
         content: "❌ Bạn không đủ tiền!",
-        flags: 64,
+        ephemeral: true,
       });
     }
 
@@ -151,6 +151,7 @@ async function startGame(message, room) {
     const totalPot = room.bet * room.players.size;
     const winAmount = Math.floor(totalPot / winners.length);
 
+    // Trừ tiền
     for (const playerId of room.players) {
       const user = await User.findOne({ userId: playerId });
       if (!user) continue;
@@ -159,6 +160,7 @@ async function startGame(message, room) {
       await user.save();
     }
 
+    // Cộng tiền cho người thắng
     for (const w of winners) {
       const user = await User.findOne({ userId: w.playerId });
       if (!user) continue;
