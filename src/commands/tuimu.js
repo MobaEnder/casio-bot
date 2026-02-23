@@ -12,7 +12,10 @@ const {
 const User = require("../models/User");
 
 const PRICE_PER_BAG = 10000;
-const games = new Map(); // messageId -> game data
+const MAX_BAGS = 100;
+const WIN_RATE = 0.4; // 🔥 40% trúng = 60% xịt
+
+const games = new Map();
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -39,10 +42,10 @@ module.exports = {
 
     const input = new TextInputBuilder()
       .setCustomId("bag_amount")
-      .setLabel("Số túi muốn mua (10k/túi)")
+      .setLabel("Nhập số túi (10k/túi)")
       .setStyle(TextInputStyle.Short)
       .setRequired(true)
-      .setPlaceholder("Ví dụ: 5");
+      .setPlaceholder("Tối đa 100");
 
     modal.addComponents(new ActionRowBuilder().addComponents(input));
 
@@ -63,6 +66,13 @@ module.exports = {
       });
     }
 
+    if (amount > MAX_BAGS) {
+      return interaction.reply({
+        content: "❌ Bạn chỉ được mua tối đa 100 túi!",
+        flags: 64,
+      });
+    }
+
     let user = await User.findOne({ userId: interaction.user.id });
     if (!user) user = await User.create({ userId: interaction.user.id });
 
@@ -77,7 +87,6 @@ module.exports = {
       });
     }
 
-    // Trừ tiền trước
     user.money -= totalCost;
     await user.save();
 
@@ -85,7 +94,7 @@ module.exports = {
       .setColor(0xffcc00)
       .setTitle("🎁 TÚI MÙ MAY MẮN")
       .setDescription(
-        `🛍️ Bạn đã mua **${amount} túi mù**\n` +
+        `🛍️ Bạn đã mua **${amount} túi**\n` +
           `💸 Tổng tiền: **${totalCost.toLocaleString("vi-VN")} VND**\n\n` +
           `👉 Nhấn nút bên dưới để mở túi!`
       )
@@ -115,67 +124,106 @@ module.exports = {
   },
 
   async handleButton(interaction) {
-    if (interaction.customId !== "tuimu_open") return;
-
     const game = games.get(interaction.message.id);
-    if (!game) {
-      return interaction.reply({
-        content: "❌ Phiên này đã hết hạn!",
-        flags: 64,
-      });
-    }
+    if (!game) return;
 
-    if (interaction.user.id !== game.userId) {
-      return interaction.reply({
-        content: "❌ Đây không phải túi của bạn!",
-        flags: 64,
-      });
-    }
-
-    let user = await User.findOne({ userId: interaction.user.id });
-    if (!user) return;
-
-    let resultText = "";
-    let totalReward = 0;
-
-    for (let i = 1; i <= game.amount; i++) {
-      const win = Math.random() < 0.4; // 50/50
-
-      const reward = Math.floor(
-        Math.random() * (100000 - 5000 + 1) + 5000
-      );
-
-      if (win) {
-        totalReward += reward;
-        resultText += `🎉 Túi ${i}: +${reward.toLocaleString("vi-VN")} VND\n`;
-      } else {
-        resultText += `💀 Túi ${i}: 0 VND\n`;
+    // 🎁 MỞ TÚI
+    if (interaction.customId === "tuimu_open") {
+      if (interaction.user.id !== game.userId) {
+        return interaction.reply({
+          content: "❌ Đây không phải túi của bạn!",
+          flags: 64,
+        });
       }
+
+      let user = await User.findOne({ userId: interaction.user.id });
+      if (!user) return;
+
+      const results = [];
+      let totalReward = 0;
+
+      for (let i = 1; i <= game.amount; i++) {
+        const win = Math.random() < WIN_RATE; // 🔥 60% xịt
+
+        if (win) {
+          const reward = Math.floor(
+            Math.random() * (100000 - 5000 + 1) + 5000
+          );
+          totalReward += reward;
+          results.push(`🎉 Túi ${i}: +${reward.toLocaleString("vi-VN")} VND`);
+        } else {
+          results.push(`💀 Túi ${i}: XỊT`);
+        }
+      }
+
+      user.money += totalReward;
+      await user.save();
+
+      const profit = totalReward - game.totalCost;
+
+      game.results = results;
+      game.totalReward = totalReward;
+      game.profit = profit;
+
+      const page1 = results.slice(0, 50).join("\n");
+      const page2 = results.slice(50, 100).join("\n");
+
+      const embed = new EmbedBuilder()
+        .setColor(profit >= 0 ? 0x00ff00 : 0xff0000)
+        .setTitle(
+          `🎊 KẾT QUẢ MỞ TÚI (${game.amount > 50 ? "Trang 1/2" : "Trang 1/1"})`
+        )
+        .setDescription(
+          `${page1}\n\n` +
+            `💰 Tổng nhận: **${totalReward.toLocaleString("vi-VN")} VND**\n` +
+            `📊 Lãi/Lỗ: **${profit >= 0 ? "+" : ""}${profit.toLocaleString(
+              "vi-VN"
+            )} VND**`
+        )
+        .setFooter({ text: "HOP-BOT Casino 💎" })
+        .setTimestamp();
+
+      const row =
+        game.amount > 50
+          ? new ActionRowBuilder().addComponents(
+              new ButtonBuilder()
+                .setCustomId("tuimu_page2")
+                .setLabel("➡️ Trang 2")
+                .setStyle(ButtonStyle.Primary)
+            )
+          : [];
+
+      await interaction.update({
+        embeds: [embed],
+        components: row ? [row] : [],
+      });
+
+      // ⏳ Tự xoá nút sau 30s
+      setTimeout(async () => {
+        try {
+          await interaction.message.edit({ components: [] });
+        } catch (err) {}
+      }, 30000);
     }
 
-    user.money += totalReward;
-    await user.save();
+    // 📖 TRANG 2
+    if (interaction.customId === "tuimu_page2") {
+      const page2 = game.results.slice(50, 100).join("\n");
 
-    const profit = totalReward - game.totalCost;
+      const embed = new EmbedBuilder()
+        .setColor(game.profit >= 0 ? 0x00ff00 : 0xff0000)
+        .setTitle("🎊 KẾT QUẢ MỞ TÚI (Trang 2/2)")
+        .setDescription(
+          `${page2}\n\n` +
+            `💰 Tổng nhận: **${game.totalReward.toLocaleString("vi-VN")} VND**\n` +
+            `📊 Lãi/Lỗ: **${game.profit >= 0 ? "+" : ""}${game.profit.toLocaleString(
+              "vi-VN"
+            )} VND**`
+        )
+        .setFooter({ text: "HOP-BOT Casino 💎" })
+        .setTimestamp();
 
-    const embed = new EmbedBuilder()
-      .setColor(profit >= 0 ? 0x00ff00 : 0xff0000)
-      .setTitle("🎊 KẾT QUẢ MỞ TÚI")
-      .setDescription(
-        `${resultText}\n` +
-          `💰 Tổng nhận: **${totalReward.toLocaleString("vi-VN")} VND**\n` +
-          `📊 Lãi/Lỗ: **${profit >= 0 ? "+" : ""}${profit.toLocaleString(
-            "vi-VN"
-          )} VND**`
-      )
-      .setFooter({ text: "HOP-BOT Casino 💎" })
-      .setTimestamp();
-
-    await interaction.update({
-      embeds: [embed],
-      components: [],
-    });
-
-    games.delete(interaction.message.id);
+      await interaction.update({ embeds: [embed] });
+    }
   },
 };
