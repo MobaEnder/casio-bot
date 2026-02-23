@@ -49,7 +49,7 @@ if (user.banned) {
         "👉 Chọn **Nai, Bầu, Gà, Cá, Cua hoặc Tôm** để đặt cược!\n" +
         "⏳ Bàn sẽ lắc sau **30 giây**..."
       )
-      .setFooter({ text: "HOP-BOT Casino 💎" })
+      .setFooter({ text: "BOT Casino 💎" })
       .setTimestamp();
 
     const row1 = new ActionRowBuilder().addComponents(
