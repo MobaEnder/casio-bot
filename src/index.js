@@ -82,15 +82,17 @@ const rest = new REST({ version: "10" }).setToken(TOKEN);
 // ===== INTERACTION HANDLER =====
 client.on(Events.InteractionCreate, async interaction => {
   try {
-    // Slash commands
+
+    // ================= SLASH =================
     if (interaction.isChatInputCommand()) {
       const command = client.commands.get(interaction.commandName);
       if (!command) return;
       return await command.execute(interaction);
     }
 
-    // Buttons
+    // ================= BUTTON =================
     if (interaction.isButton()) {
+
       const taixiu = require("./commands/taixiu");
       const baucua = require("./commands/baucua");
       const vaytien = require("./commands/vaytien");
@@ -100,6 +102,10 @@ client.on(Events.InteractionCreate, async interaction => {
       const daoham = require("./commands/daoham");
       const tuimu = require("./commands/tuimu");
       const baicao = require("./commands/baicao");
+      const pet = require("./commands/pet"); // 🔥 PET
+
+      if (interaction.customId.startsWith("pet_") && pet.handleButton)
+        return await pet.handleButton(interaction);
 
       if (interaction.customId.startsWith("taixiu_") && taixiu.handleButton)
         return await taixiu.handleButton(interaction);
@@ -109,13 +115,13 @@ client.on(Events.InteractionCreate, async interaction => {
 
       if (interaction.customId.startsWith("vaytien:") && vaytien.handleButton)
         return await vaytien.handleButton(interaction);
-      
+
       if (interaction.customId.startsWith("duangua_") && duangua.handleButton)
         return await duangua.handleButton(interaction);
 
       if (interaction.customId.startsWith("daga_") && daga.handleButton)
         return await daga.handleButton(interaction);
-      
+
       if (interaction.customId.startsWith("reset_") && reset.handleButton)
         return await reset.handleButton(interaction);
 
@@ -127,11 +133,11 @@ client.on(Events.InteractionCreate, async interaction => {
 
       if (interaction.customId.startsWith("baicao_") && baicao.handleButton)
         return await baicao.handleButton(interaction);
-      
     }
 
-    // Modals
+    // ================= MODAL =================
     if (interaction.isModalSubmit()) {
+
       const taixiu = require("./commands/taixiu");
       const baucua = require("./commands/baucua");
       const duangua = require("./commands/duangua");
@@ -139,6 +145,10 @@ client.on(Events.InteractionCreate, async interaction => {
       const daoham = require("./commands/daoham");
       const tuimu = require("./commands/tuimu");
       const baicao = require("./commands/baicao");
+      const pet = require("./commands/pet"); // 🔥 PET
+
+      if (interaction.customId.startsWith("pet_") && pet.handleModal)
+        return await pet.handleModal(interaction);
 
       if (interaction.customId.startsWith("taixiu_modal_") && taixiu.handleModal)
         return await taixiu.handleModal(interaction);
@@ -160,8 +170,8 @@ client.on(Events.InteractionCreate, async interaction => {
 
       if (interaction.customId.startsWith("baicao_") && baicao.handleModal)
         return await baicao.handleModal(interaction);
-      
     }
+
   } catch (error) {
     console.error("❌ Interaction error:", error);
     try {
