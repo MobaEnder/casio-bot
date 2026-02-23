@@ -49,9 +49,9 @@ const PET_TYPES = {
 
 const PET_EVOLUTION = {
   fire: [
-    { level: 1, image: "https://link-fire-lv1.png" },
-    { level: 30, image: "https://link-fire-lv30.png" },
-    { level: 60, image: "https://link-fire-lv60.png" },
+    { level: 1, image: "https://cdn.discordapp.com/attachments/919941010304417834/1475528361643085894/image.png" },
+    { level: 30, image: "https://cdn.discordapp.com/attachments/1475525093785600122/1475530189575295148/Gemini_Generated_Image_qmg1s0qmg1s0qmg1_1.png" },
+    { level: 60, image: "https://cdn.discordapp.com/attachments/1475525093785600122/1475532076466835498/image.png" },
   ],
   water: [
     { level: 1, image: "https://link-water-lv1.png" },
