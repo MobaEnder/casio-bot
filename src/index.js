@@ -99,6 +99,7 @@ client.on(Events.InteractionCreate, async interaction => {
       const reset = require("./commands/reset");
       const daoham = require("./commands/daoham");
       const tuimu = require("./commands/tuimu");
+      const baicao = require("./commands/baicao");
 
       if (interaction.customId.startsWith("taixiu_") && taixiu.handleButton)
         return await taixiu.handleButton(interaction);
@@ -123,6 +124,10 @@ client.on(Events.InteractionCreate, async interaction => {
 
       if (interaction.customId.startsWith("tuimu_") && tuimu.handleButton)
         return await tuimu.handleButton(interaction);
+
+      if (interaction.customId.startsWith("baicao_") && baicao.handleButton)
+        return await baicao.handleButton(interaction);
+      
     }
 
     // Modals
@@ -133,6 +138,7 @@ client.on(Events.InteractionCreate, async interaction => {
       const daga = require("./commands/daga");
       const daoham = require("./commands/daoham");
       const tuimu = require("./commands/tuimu");
+      const baicao = require("./commands/baicao");
 
       if (interaction.customId.startsWith("taixiu_modal_") && taixiu.handleModal)
         return await taixiu.handleModal(interaction);
@@ -151,6 +157,9 @@ client.on(Events.InteractionCreate, async interaction => {
 
       if (interaction.customId.startsWith("tuimu_") && tuimu.handleModal)
         return await tuimu.handleModal(interaction);
+
+      if (interaction.customId.startsWith("baicao_") && baicao.handleModal)
+        return await baicao.handleModal(interaction);
       
     }
   } catch (error) {
