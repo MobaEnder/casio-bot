@@ -139,7 +139,7 @@ module.exports = {
     let totalReward = 0;
 
     for (let i = 1; i <= game.amount; i++) {
-      const win = Math.random() < 0.5; // 50/50
+      const win = Math.random() < 0.4; // 50/50
 
       const reward = Math.floor(
         Math.random() * (100000 - 5000 + 1) + 5000
