@@ -32,9 +32,9 @@ function getCrashChance(floor) {
 /* 🎲 TỈ LỆ TẦNG RỖNG */
 /* ======================= */
 function getEmptyChance(floor) {
-  if (floor <= 10) return 25;   // 25% không có gì
-  if (floor <= 20) return 20;   // 20%
-  return 15;                    // 15%
+  if (floor <= 10) return 25;
+  if (floor <= 20) return 20;
+  return 15;
 }
 
 /* ======================= */
@@ -73,7 +73,7 @@ function getOreByFloor(floor) {
   const baseValue =
     Math.floor(Math.random() * (ore.max - ore.min + 1)) + ore.min;
 
-  const multiplier = Math.floor(Math.random() * 4) + 2; // x2 - x5
+  const multiplier = Math.floor(Math.random() * 4) + 2;
 
   return {
     name: ore.name,
@@ -99,7 +99,7 @@ module.exports = {
     if (bet < MIN_BET) {
       return interaction.reply({
         content: "❌ Tiền cược tối thiểu là 50.000 VND!",
-        ephemeral: true,
+        flags: 64,
       });
     }
 
@@ -109,7 +109,7 @@ module.exports = {
     if (user.money < bet) {
       return interaction.reply({
         content: "❌ Bạn không đủ tiền!",
-        ephemeral: true,
+        flags: 64,
       });
     }
 
@@ -137,11 +137,12 @@ module.exports = {
         .setDisabled(true)
     );
 
-    const msg = await interaction.reply({
+    await interaction.reply({
       embeds: [embed],
       components: [row],
-      fetchReply: true,
     });
+
+    const msg = await interaction.fetchReply();
 
     games.set(msg.id, {
       userId: interaction.user.id,
@@ -164,6 +165,12 @@ module.exports = {
     if (interaction.customId === "daoham_continue") {
       game.floor++;
 
+      if (game.floor > MAX_FLOOR) {
+        await interaction.editReply({ components: [] });
+        games.delete(interaction.message.id);
+        return;
+      }
+
       const crashChance = getCrashChance(game.floor);
       const crash = Math.random() * 100 < crashChance;
 
@@ -181,34 +188,32 @@ module.exports = {
         return;
       }
 
-      // 🎲 Kiểm tra tầng rỗng
       const emptyChance = getEmptyChance(game.floor);
       const isEmpty = Math.random() * 100 < emptyChance;
+
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId("daoham_continue")
+          .setLabel("⛏️ ĐÀO TIẾP")
+          .setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
+          .setCustomId("daoham_cashout")
+          .setLabel("💰 RÚT TIỀN")
+          .setStyle(ButtonStyle.Primary)
+      );
 
       if (isEmpty) {
         const embed = new EmbedBuilder()
           .setColor(0xffff00)
-          .setTitle("⛏️ ĐÀO TRÚNG TẦNG RỖNG!")
+          .setTitle("⛏️ TẦNG RỖNG!")
           .setDescription(
-            `📍 Tầng: **${game.floor}**\n` +
-            `😢 Không tìm thấy gì...`
+            `📍 Tầng: **${game.floor}**\n😢 Không tìm thấy gì...`
           );
 
-        await interaction.editReply({
+        return interaction.editReply({
           embeds: [embed],
-          components: new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-              .setCustomId("daoham_continue")
-              .setLabel("⛏️ ĐÀO TIẾP")
-              .setStyle(ButtonStyle.Success),
-            new ButtonBuilder()
-              .setCustomId("daoham_cashout")
-              .setLabel("💰 RÚT TIỀN")
-              .setStyle(ButtonStyle.Primary)
-          ),
+          components: [row],
         });
-
-        return;
       }
 
       const ore = getOreByFloor(game.floor);
@@ -225,18 +230,9 @@ module.exports = {
           `📦 Tổng quặng: **${game.totalReward.toLocaleString("vi-VN")} VND**`
         );
 
-      await interaction.editReply({
+      return interaction.editReply({
         embeds: [embed],
-        components: new ActionRowBuilder().addComponents(
-          new ButtonBuilder()
-            .setCustomId("daoham_continue")
-            .setLabel("⛏️ ĐÀO TIẾP")
-            .setStyle(ButtonStyle.Success),
-          new ButtonBuilder()
-            .setCustomId("daoham_cashout")
-            .setLabel("💰 RÚT TIỀN")
-            .setStyle(ButtonStyle.Primary)
-        ),
+        components: [row],
       });
     }
 
