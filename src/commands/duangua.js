@@ -42,7 +42,7 @@ module.exports = {
         "1️⃣ 2️⃣ 3️⃣ 4️⃣ 5️⃣\n" +
         "6️⃣ 7️⃣ 8️⃣ 9️⃣ 🔟"
       )
-      .setFooter({ text: "HOP-BOT Casino 💎" })
+      .setFooter({ text: "BOT Casino 💎" })
       .setTimestamp();
 
     const rows = [];
@@ -173,7 +173,7 @@ async function startRace(message) {
     .setColor(0x00ff99)
     .setTitle("🐎 CUỘC ĐUA ĐANG DIỄN RA!")
     .setDescription(render())
-    .setFooter({ text: "HOP-BOT Casino 💎" })
+    .setFooter({ text: "BOT Casino 💎" })
     .setTimestamp();
 
   await message.edit({
@@ -237,7 +237,7 @@ async function finishRace(message, winnerHorse) {
       `🏆 **Người thắng:**\n${winList || "Không ai 😢"}\n` +
       `💀 **Người thua:**\n${loseList || "Không ai 😎"}`
     )
-    .setFooter({ text: "HOP-BOT Casino 💎" })
+    .setFooter({ text: "BOT Casino 💎" })
     .setTimestamp();
 
   await message.edit({
