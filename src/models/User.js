@@ -27,6 +27,32 @@ const userSchema = new mongoose.Schema({
 
   banned: { type: Boolean, default: false },
 
+  // 🐲 Pet System
+  pet: {
+    type: {
+      id: { type: String, default: null },
+      name: { type: String, default: null },
+      element: { type: String, default: null },
+      race: { type: String, default: "dragon" },
+
+      level: { type: Number, default: 1 },
+      exp: { type: Number, default: 0 },
+      expNeeded: { type: Number, default: 120 },
+
+      evolution: { type: Number, default: 0 },
+
+      stats: {
+        hp: { type: Number, default: 0 },
+        atk: { type: Number, default: 0 },
+        def: { type: Number, default: 0 },
+        spd: { type: Number, default: 0 },
+      },
+
+      createdAt: { type: Date, default: null },
+    },
+    default: null,
+  },
+
   createdAt: { type: Date, default: Date.now },
 });
 
