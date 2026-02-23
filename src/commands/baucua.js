@@ -147,7 +147,7 @@ if (user.banned) {
           `🏆 **Người thắng:**\n${winList || "Không ai 😢"}\n` +
           `💀 **Người thua:**\n${loseList || "Không ai 😎"}`
         )
-        .setFooter({ text: "HOP-BOT Casino 💎" })
+        .setFooter({ text: "BOT Casino 💎" })
         .setTimestamp();
 
       await message.edit({
