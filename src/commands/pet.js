@@ -67,10 +67,19 @@ const PET_EVOLUTION = {
 
 function getPetStage(type, level) {
   const stages = PET_EVOLUTION[type];
-  let current = stages[0];
-  for (const stage of stages) {
-    if (level >= stage.level) current = stage;
+
+  if (!stages || stages.length === 0) {
+    return { level: 1, image: null };
   }
+
+  let current = stages[0];
+
+  for (const stage of stages) {
+    if (level >= stage.level) {
+      current = stage;
+    }
+  }
+
   return current;
 }
 
@@ -308,7 +317,7 @@ if (
         return interaction.reply({ content: "❌ Bạn chưa có pet!", flags: 64 });
 
       const p = user.pet;
-      const key = p.element.replace("🔥 ", "").replace("💧 ", "").replace("⚡ ", "").toLowerCase();
+      const key = p.type;
       const stage = getPetStage(key, p.level);
 
       const embed = new EmbedBuilder()
@@ -351,6 +360,7 @@ if (
     user.pet = {
       id: config.id,
       name,
+      type: type,
       element: config.element,
       race: config.race,
       level: 1,
