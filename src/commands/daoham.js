@@ -10,24 +10,31 @@ const User = require("../models/User");
 
 const games = new Map();
 const MAX_FLOOR = 36;
+const MIN_BET = 50000;
 
 /* ======================= */
 /* 🎯 TỈ LỆ XẬP THEO TẦNG */
 /* ======================= */
 function getCrashChance(floor) {
   if (floor >= 1 && floor <= 10) {
-    return 1 + ((floor - 1) * (6 / 9)); // 1% -> 7%
+    return 1 + ((floor - 1) * (6 / 9));
   }
-
   if (floor >= 11 && floor <= 20) {
-    return 7 + ((floor - 11) * (9 / 9)); // 7% -> 16%
+    return 7 + ((floor - 11) * (9 / 9));
   }
-
   if (floor >= 21 && floor <= 36) {
-    return 16 + ((floor - 21) * (4 / 15)); // 16% -> 20%
+    return 16 + ((floor - 21) * (4 / 15));
   }
-
   return 20;
+}
+
+/* ======================= */
+/* 🎲 TỈ LỆ TẦNG RỖNG */
+/* ======================= */
+function getEmptyChance(floor) {
+  if (floor <= 10) return 25;   // 25% không có gì
+  if (floor <= 20) return 20;   // 20%
+  return 15;                    // 15%
 }
 
 /* ======================= */
@@ -36,27 +43,27 @@ function getCrashChance(floor) {
 function getOreByFloor(floor) {
   let ores;
 
-  if (floor >= 1 && floor <= 10) {
+  if (floor <= 10) {
     ores = [
-      { name: "🪨 Đá Thường", min: 5000, max: 10000 },
-      { name: "🟤 Đồng", min: 8000, max: 15000 },
+      { name: "🪨 Đá Thường", min: 5000, max: 20000 },
+      { name: "🟤 Đồng", min: 8000, max: 20000 },
       { name: "⚙️ Sắt", min: 10000, max: 20000 },
       { name: "🔩 Bạc Thô", min: 12000, max: 20000 },
       { name: "💠 Thạch Anh", min: 15000, max: 20000 },
     ];
-  } else if (floor >= 11 && floor <= 20) {
+  } else if (floor <= 20) {
     ores = [
-      { name: "🥈 Bạc", min: 30000, max: 40000 },
-      { name: "🟡 Vàng Thô", min: 35000, max: 45000 },
+      { name: "🥈 Bạc", min: 30000, max: 50000 },
+      { name: "🟡 Vàng", min: 35000, max: 50000 },
       { name: "🔷 Sapphire", min: 40000, max: 50000 },
       { name: "💎 Kim Cương Thô", min: 45000, max: 50000 },
       { name: "🔮 Đá Ma Thuật", min: 30000, max: 50000 },
     ];
   } else {
     ores = [
-      { name: "💎 Kim Cương", min: 50000, max: 60000 },
+      { name: "💎 Kim Cương", min: 50000, max: 70000 },
       { name: "🟥 Ruby", min: 55000, max: 70000 },
-      { name: "🟦 Ngọc Lam", min: 50000, max: 65000 },
+      { name: "🟦 Ngọc Lam", min: 50000, max: 70000 },
       { name: "🟪 Thạch Tím", min: 60000, max: 70000 },
       { name: "👑 Quặng Huyền Thoại", min: 60000, max: 70000 },
     ];
@@ -66,7 +73,7 @@ function getOreByFloor(floor) {
   const baseValue =
     Math.floor(Math.random() * (ore.max - ore.min + 1)) + ore.min;
 
-  const multiplier = Math.floor(Math.random() * 4) + 2; // x2 -> x5
+  const multiplier = Math.floor(Math.random() * 4) + 2; // x2 - x5
 
   return {
     name: ore.name,
@@ -82,16 +89,16 @@ module.exports = {
     .addIntegerOption(option =>
       option
         .setName("tien")
-        .setDescription("Số tiền cược")
+        .setDescription("Số tiền cược (tối thiểu 50.000)")
         .setRequired(true)
     ),
 
   async execute(interaction) {
     const bet = interaction.options.getInteger("tien");
 
-    if (bet <= 0) {
+    if (bet < MIN_BET) {
       return interaction.reply({
-        content: "❌ Số tiền không hợp lệ!",
+        content: "❌ Tiền cược tối thiểu là 50.000 VND!",
         ephemeral: true,
       });
     }
@@ -114,10 +121,9 @@ module.exports = {
       .setTitle("⛏️ ĐÀO HẦM BẮT ĐẦU")
       .setDescription(
         `💰 Tiền cược: **${bet.toLocaleString("vi-VN")} VND**\n\n` +
-          `📍 Tầng hiện tại: **0**\n` +
-          `👉 Nhấn ĐÀO để bắt đầu!`
-      )
-      .setTimestamp();
+        `📍 Tầng hiện tại: **0**\n` +
+        `👉 Nhấn ĐÀO để bắt đầu!`
+      );
 
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
@@ -155,9 +161,6 @@ module.exports = {
     let user = await User.findOne({ userId: interaction.user.id });
     if (!user) return;
 
-    /* ======================= */
-    /* ⛏️ ĐÀO TIẾP */
-    /* ======================= */
     if (interaction.customId === "daoham_continue") {
       game.floor++;
 
@@ -170,16 +173,41 @@ module.exports = {
           .setTitle("💥 XẬP HẦM!")
           .setDescription(
             `📍 Bạn chết ở tầng **${game.floor}**\n` +
-              `💀 Mất: **${game.bet.toLocaleString("vi-VN")} VND**`
-          )
-          .setTimestamp();
+            `💀 Mất: **${game.bet.toLocaleString("vi-VN")} VND**`
+          );
+
+        await interaction.editReply({ embeds: [embed], components: [] });
+        games.delete(interaction.message.id);
+        return;
+      }
+
+      // 🎲 Kiểm tra tầng rỗng
+      const emptyChance = getEmptyChance(game.floor);
+      const isEmpty = Math.random() * 100 < emptyChance;
+
+      if (isEmpty) {
+        const embed = new EmbedBuilder()
+          .setColor(0xffff00)
+          .setTitle("⛏️ ĐÀO TRÚNG TẦNG RỖNG!")
+          .setDescription(
+            `📍 Tầng: **${game.floor}**\n` +
+            `😢 Không tìm thấy gì...`
+          );
 
         await interaction.editReply({
           embeds: [embed],
-          components: [],
+          components: new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+              .setCustomId("daoham_continue")
+              .setLabel("⛏️ ĐÀO TIẾP")
+              .setStyle(ButtonStyle.Success),
+            new ButtonBuilder()
+              .setCustomId("daoham_cashout")
+              .setLabel("💰 RÚT TIỀN")
+              .setStyle(ButtonStyle.Primary)
+          ),
         });
 
-        games.delete(interaction.message.id);
         return;
       }
 
@@ -190,41 +218,30 @@ module.exports = {
         .setColor(0x00ffcc)
         .setTitle("⛏️ ĐÀO THÀNH CÔNG!")
         .setDescription(
-          `📍 Tầng: **${game.floor}**\n` +
-            `🎯 Tỉ lệ xập: **${crashChance.toFixed(2)}%**\n\n` +
-            `⛏️ Tìm thấy: **${ore.name}**\n` +
-            `✨ Nhân: x${ore.multiplier}\n` +
-            `💰 Giá trị: **${ore.value.toLocaleString("vi-VN")} VND**\n\n` +
-            `📦 Tổng quặng: **${game.totalReward.toLocaleString("vi-VN")} VND**`
-        )
-        .setTimestamp();
-
-      const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId("daoham_continue")
-          .setLabel("⛏️ ĐÀO TIẾP")
-          .setStyle(ButtonStyle.Success),
-        new ButtonBuilder()
-          .setCustomId("daoham_cashout")
-          .setLabel("💰 RÚT TIỀN")
-          .setStyle(ButtonStyle.Primary)
-      );
+          `📍 Tầng: **${game.floor}**\n\n` +
+          `⛏️ Tìm thấy: **${ore.name}**\n` +
+          `✨ Nhân: x${ore.multiplier}\n` +
+          `💰 Giá trị: **${ore.value.toLocaleString("vi-VN")} VND**\n\n` +
+          `📦 Tổng quặng: **${game.totalReward.toLocaleString("vi-VN")} VND**`
+        );
 
       await interaction.editReply({
         embeds: [embed],
-        components: [row],
+        components: new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId("daoham_continue")
+            .setLabel("⛏️ ĐÀO TIẾP")
+            .setStyle(ButtonStyle.Success),
+          new ButtonBuilder()
+            .setCustomId("daoham_cashout")
+            .setLabel("💰 RÚT TIỀN")
+            .setStyle(ButtonStyle.Primary)
+        ),
       });
-
-      return;
     }
 
-    /* ======================= */
-    /* 💰 RÚT TIỀN */
-    /* ======================= */
     if (interaction.customId === "daoham_cashout") {
-      const reward = game.totalReward;
-
-      user.money += reward;
+      user.money += game.totalReward;
       await user.save();
 
       const embed = new EmbedBuilder()
@@ -232,15 +249,10 @@ module.exports = {
         .setTitle("💰 RÚT TIỀN THÀNH CÔNG!")
         .setDescription(
           `📍 Dừng ở tầng: **${game.floor}**\n` +
-            `📦 Tổng quặng bán được: **${reward.toLocaleString("vi-VN")} VND**`
-        )
-        .setTimestamp();
+          `📦 Tổng bán quặng: **${game.totalReward.toLocaleString("vi-VN")} VND**`
+        );
 
-      await interaction.editReply({
-        embeds: [embed],
-        components: [],
-      });
-
+      await interaction.editReply({ embeds: [embed], components: [] });
       games.delete(interaction.message.id);
     }
   },
