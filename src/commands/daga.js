@@ -28,7 +28,7 @@ module.exports = {
         "🔴 **GÀ ĐỎ**\n⚫ **GÀ ĐEN**\n\n" +
         "⏳ Thời gian đặt cược: **30 giây**"
       )
-      .setFooter({ text: "HOP-BOT Casino 💎" })
+      .setFooter({ text: "BOT Casino 💎" })
       .setTimestamp();
 
     const row = new ActionRowBuilder().addComponents(
