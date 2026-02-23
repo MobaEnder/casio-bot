@@ -25,7 +25,7 @@ module.exports = {
       .setColor(0x00ff99)
       .setTitle("🐷 Ví tiền của bạn")
       .setDescription(`💵 Bạn đang có **${user.money.toLocaleString("vi-VN")} VND**`)
-      .setFooter({ text: "HOP-BOT 💖 Chúc bạn chơi game vui vẻ!" })
+      .setFooter({ text: "BOT 💖 Chúc bạn chơi game vui vẻ!" })
       .setTimestamp();
 
     const response = await interaction.reply({
