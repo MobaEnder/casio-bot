@@ -11,7 +11,9 @@ const User = require("../models/User");
 const games = new Map();
 const MAX_FLOOR = 36;
 
-// 🎯 TÍNH % XẬP THEO TẦNG
+/* ======================= */
+/* 🎯 TỈ LỆ XẬP THEO TẦNG */
+/* ======================= */
 function getCrashChance(floor) {
   if (floor >= 1 && floor <= 10) {
     return 1 + ((floor - 1) * (6 / 9)); // 1% -> 7%
@@ -28,15 +30,55 @@ function getCrashChance(floor) {
   return 20;
 }
 
-// 💰 HỆ SỐ NHÂN
-function getMultiplier(floor) {
-  return 1 + floor * 0.25;
+/* ======================= */
+/* ⛏️ RANDOM QUẶNG */
+/* ======================= */
+function getOreByFloor(floor) {
+  let ores;
+
+  if (floor >= 1 && floor <= 10) {
+    ores = [
+      { name: "🪨 Đá Thường", min: 5000, max: 10000 },
+      { name: "🟤 Đồng", min: 8000, max: 15000 },
+      { name: "⚙️ Sắt", min: 10000, max: 20000 },
+      { name: "🔩 Bạc Thô", min: 12000, max: 20000 },
+      { name: "💠 Thạch Anh", min: 15000, max: 20000 },
+    ];
+  } else if (floor >= 11 && floor <= 20) {
+    ores = [
+      { name: "🥈 Bạc", min: 30000, max: 40000 },
+      { name: "🟡 Vàng Thô", min: 35000, max: 45000 },
+      { name: "🔷 Sapphire", min: 40000, max: 50000 },
+      { name: "💎 Kim Cương Thô", min: 45000, max: 50000 },
+      { name: "🔮 Đá Ma Thuật", min: 30000, max: 50000 },
+    ];
+  } else {
+    ores = [
+      { name: "💎 Kim Cương", min: 50000, max: 60000 },
+      { name: "🟥 Ruby", min: 55000, max: 70000 },
+      { name: "🟦 Ngọc Lam", min: 50000, max: 65000 },
+      { name: "🟪 Thạch Tím", min: 60000, max: 70000 },
+      { name: "👑 Quặng Huyền Thoại", min: 60000, max: 70000 },
+    ];
+  }
+
+  const ore = ores[Math.floor(Math.random() * ores.length)];
+  const baseValue =
+    Math.floor(Math.random() * (ore.max - ore.min + 1)) + ore.min;
+
+  const multiplier = Math.floor(Math.random() * 4) + 2; // x2 -> x5
+
+  return {
+    name: ore.name,
+    value: baseValue * multiplier,
+    multiplier,
+  };
 }
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("daoham")
-    .setDescription("⛏️ Đào hầm kiếm tiền")
+    .setDescription("⛏️ Đào hầm kiếm quặng")
     .addIntegerOption(option =>
       option
         .setName("tien")
@@ -72,10 +114,9 @@ module.exports = {
       .setTitle("⛏️ ĐÀO HẦM BẮT ĐẦU")
       .setDescription(
         `💰 Tiền cược: **${bet.toLocaleString("vi-VN")} VND**\n\n` +
-        `📍 Đang ở tầng: **0**\n` +
-        `👉 Nhấn ĐÀO để bắt đầu!`
+          `📍 Tầng hiện tại: **0**\n` +
+          `👉 Nhấn ĐÀO để bắt đầu!`
       )
-      .setFooter({ text: "BOT Casino 💎" })
       .setTimestamp();
 
     const row = new ActionRowBuilder().addComponents(
@@ -100,6 +141,7 @@ module.exports = {
       userId: interaction.user.id,
       bet,
       floor: 0,
+      totalReward: 0,
     });
   },
 
@@ -108,13 +150,14 @@ module.exports = {
 
     const game = games.get(interaction.message.id);
     if (!game) return;
-
     if (interaction.user.id !== game.userId) return;
 
     let user = await User.findOne({ userId: interaction.user.id });
     if (!user) return;
 
-    // ⛏️ ĐÀO
+    /* ======================= */
+    /* ⛏️ ĐÀO TIẾP */
+    /* ======================= */
     if (interaction.customId === "daoham_continue") {
       game.floor++;
 
@@ -127,8 +170,7 @@ module.exports = {
           .setTitle("💥 XẬP HẦM!")
           .setDescription(
             `📍 Bạn chết ở tầng **${game.floor}**\n` +
-            `💀 Mất: **${game.bet.toLocaleString("vi-VN")} VND**\n` +
-            `🎯 Tỉ lệ xập: **${crashChance.toFixed(2)}%**`
+              `💀 Mất: **${game.bet.toLocaleString("vi-VN")} VND**`
           )
           .setTimestamp();
 
@@ -141,39 +183,19 @@ module.exports = {
         return;
       }
 
-      if (game.floor >= MAX_FLOOR) {
-        const reward = Math.floor(game.bet * getMultiplier(game.floor));
-        user.money += reward;
-        await user.save();
-
-        const embed = new EmbedBuilder()
-          .setColor(0x00ff00)
-          .setTitle("🏆 ĐÀO TỚI ĐÁY HẦM!")
-          .setDescription(
-            `📍 Tầng: **${game.floor}**\n` +
-            `💰 Nhận: **${reward.toLocaleString("vi-VN")} VND**`
-          )
-          .setTimestamp();
-
-        await interaction.editReply({
-          embeds: [embed],
-          components: [],
-        });
-
-        games.delete(interaction.message.id);
-        return;
-      }
-
-      const multiplier = getMultiplier(game.floor);
-      const currentWin = Math.floor(game.bet * multiplier);
+      const ore = getOreByFloor(game.floor);
+      game.totalReward += ore.value;
 
       const embed = new EmbedBuilder()
         .setColor(0x00ffcc)
         .setTitle("⛏️ ĐÀO THÀNH CÔNG!")
         .setDescription(
-          `📍 Tầng hiện tại: **${game.floor}**\n` +
-          `🎯 Tỉ lệ xập: **${crashChance.toFixed(2)}%**\n` +
-          `💰 Nếu rút bây giờ: **${currentWin.toLocaleString("vi-VN")} VND**`
+          `📍 Tầng: **${game.floor}**\n` +
+            `🎯 Tỉ lệ xập: **${crashChance.toFixed(2)}%**\n\n` +
+            `⛏️ Tìm thấy: **${ore.name}**\n` +
+            `✨ Nhân: x${ore.multiplier}\n` +
+            `💰 Giá trị: **${ore.value.toLocaleString("vi-VN")} VND**\n\n` +
+            `📦 Tổng quặng: **${game.totalReward.toLocaleString("vi-VN")} VND**`
         )
         .setTimestamp();
 
@@ -192,12 +214,15 @@ module.exports = {
         embeds: [embed],
         components: [row],
       });
+
+      return;
     }
 
-    // 💰 RÚT TIỀN
+    /* ======================= */
+    /* 💰 RÚT TIỀN */
+    /* ======================= */
     if (interaction.customId === "daoham_cashout") {
-      const multiplier = getMultiplier(game.floor);
-      const reward = Math.floor(game.bet * multiplier);
+      const reward = game.totalReward;
 
       user.money += reward;
       await user.save();
@@ -207,7 +232,7 @@ module.exports = {
         .setTitle("💰 RÚT TIỀN THÀNH CÔNG!")
         .setDescription(
           `📍 Dừng ở tầng: **${game.floor}**\n` +
-          `💵 Nhận: **${reward.toLocaleString("vi-VN")} VND**`
+            `📦 Tổng quặng bán được: **${reward.toLocaleString("vi-VN")} VND**`
         )
         .setTimestamp();
 
