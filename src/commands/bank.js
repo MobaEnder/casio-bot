@@ -54,7 +54,7 @@ module.exports = {
         `💵 Số tiền: **${amount.toLocaleString("vi-VN")} VND**\n` +
         `💰 Số dư còn lại: **${sender.money.toLocaleString("vi-VN")} VND**`
       )
-      .setFooter({ text: "HOP-BOT 💖 Giao dịch an toàn & minh bạch!" })
+      .setFooter({ text: "BOT 💖 Giao dịch an toàn & minh bạch!" })
       .setTimestamp();
 
     await interaction.reply({
