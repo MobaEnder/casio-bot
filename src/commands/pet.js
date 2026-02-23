@@ -49,9 +49,9 @@ const PET_TYPES = {
 
 const PET_EVOLUTION = {
   fire: [
-    { level: 1, image: "https://cdn.discordapp.com/attachments/919941010304417834/1475528361643085894/image.png" },
-    { level: 30, image: "https://cdn.discordapp.com/attachments/1475525093785600122/1475530189575295148/Gemini_Generated_Image_qmg1s0qmg1s0qmg1_1.png" },
-    { level: 60, image: "https://cdn.discordapp.com/attachments/1475525093785600122/1475532076466835498/image.png" },
+    { level: 1, image: "https://static.wikia.nocookie.net/dragoncity/images/e/e0/Heat_Dragon_1.png/revision/latest?cb=20150914144922" },
+    { level: 30, image: "https://static.wikia.nocookie.net/dragoncity/images/3/37/Heat_Dragon_2.png/revision/latest?cb=20150914144933" },
+    { level: 60, image: "https://static.wikia.nocookie.net/dragoncity/images/0/0b/Heat_Dragon_3.png/revision/latest?cb=20150914144946" },
   ],
   water: [
     { level: 1, image: "https://link-water-lv1.png" },
