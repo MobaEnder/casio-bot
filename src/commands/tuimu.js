@@ -39,7 +39,7 @@ module.exports = {
 
     const input = new TextInputBuilder()
       .setCustomId("bag_amount")
-      .setLabel("Bạn muốn mua bao nhiêu túi? (10.000 VND / túi)")
+      .setLabel("Số túi muốn mua (10k/túi)")
       .setStyle(TextInputStyle.Short)
       .setRequired(true)
       .setPlaceholder("Ví dụ: 5");
