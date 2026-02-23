@@ -30,7 +30,7 @@ module.exports = {
             .setColor("Red")
             .setTitle("⏳ Daily chưa sẵn sàng!")
             .setDescription(`Quay lại sau **${h}h ${m}p** nữa nhé!`)
-            .setFooter({ text: "HOP BOT • Daily Reward" }),
+            .setFooter({ text: "BOT • Daily Reward" }),
         ],
         flags: 64,
       });
@@ -50,7 +50,7 @@ module.exports = {
         `💸 Bạn nhận được **${reward.toLocaleString("vi-VN")} VND**\n💰 Số dư: **${user.money.toLocaleString("vi-VN")} VND**`
       )
       .setThumbnail("https://cdn-icons-png.flaticon.com/512/10384/10384161.png")
-      .setFooter({ text: "HOP BOT • Daily System" })
+      .setFooter({ text: "BOT • Daily System" })
       .setTimestamp();
 
     const msg = await interaction.reply({ embeds: [embed], withResponse: true });
