@@ -75,7 +75,7 @@ module.exports = {
         `⏳ **Thời hạn:** ${hours} giờ\n\n` +
         `⛔ **Cảnh báo:** Không trả đúng hạn sẽ bị **CẤM VĨNH VIỄN** khỏi hệ thống cược!`
       )
-      .setFooter({ text: "HOP BOT • Loan System" })
+      .setFooter({ text: "BOT • Loan System" })
       .setTimestamp();
 
     const row = new ActionRowBuilder().addComponents(
@@ -166,7 +166,7 @@ module.exports = {
               `⏳ Hạn trả: <t:${Math.floor(Number(dueAt) / 1000)}:R>\n\n` +
               `⚠️ Không trả đúng hạn → **CẤM VĨNH VIỄN khỏi hệ thống cược!**`
             )
-            .setFooter({ text: "HOP BOT • Loan System" })
+            .setFooter({ text: "BOT • Loan System" })
             .setTimestamp(),
         ],
         components: [],
