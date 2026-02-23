@@ -28,7 +28,7 @@ module.exports = {
         .setTitle("🏆 TOP 10 ĐẠI GIA")
         .setThumbnail("https://cdn-icons-png.flaticon.com/512/10384/10384161.png")
         .setDescription(desc || "Chưa có dữ liệu 😢")
-        .setFooter({ text: "HOP BOT • Rich List" })
+        .setFooter({ text: "BOT • Rich List" })
         .setTimestamp();
 
       const msg = await interaction.editReply({
