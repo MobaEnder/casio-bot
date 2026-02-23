@@ -38,7 +38,7 @@ if (user.banned) {
         "👉 Chọn **TÀI** hoặc **XỈU** để tham gia!\n" +
         "⏳ Bàn sẽ mở trong **20 giây**..."
       )
-      .setFooter({ text: "HOP-BOT Casino 💎" })
+      .setFooter({ text: "BOT Casino 💎" })
       .setTimestamp();
 
     const row = new ActionRowBuilder().addComponents(
@@ -108,7 +108,7 @@ if (user.banned) {
           `🏆 **Người thắng:**\n${winList || "Không ai 😢"}\n` +
           `💀 **Người thua:**\n${loseList || "Không ai 😎"}`
         )
-        .setFooter({ text: "HOP-BOT Casino 💎" })
+        .setFooter({ text: "BOT Casino 💎" })
         .setTimestamp();
 
       await message.edit({
