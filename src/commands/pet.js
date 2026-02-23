@@ -171,6 +171,43 @@ module.exports = {
     }
 
     ////////////////////////////////////////////////////
+// CHỌN HỆ → MỞ MODAL ĐẶT TÊN
+////////////////////////////////////////////////////
+
+if (
+  interaction.customId === "pet_fire" ||
+  interaction.customId === "pet_water" ||
+  interaction.customId === "pet_electric"
+) {
+
+  if (user.pet)
+    return interaction.reply({
+      content: "❌ Bạn đã có pet rồi!",
+      flags: 64,
+    });
+
+  const type = interaction.customId.split("_")[1];
+
+  const modal = new ModalBuilder()
+    .setCustomId(`pet_name_${type}`)
+    .setTitle("Đặt tên cho Pet");
+
+  const input = new TextInputBuilder()
+    .setCustomId("pet_name_input")
+    .setLabel("Nhập tên pet của bạn")
+    .setStyle(TextInputStyle.Short)
+    .setMinLength(3)
+    .setMaxLength(20)
+    .setRequired(true);
+
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(input)
+  );
+
+  return interaction.showModal(modal);
+}
+
+    ////////////////////////////////////////////////////
     // SHOP
     ////////////////////////////////////////////////////
 
