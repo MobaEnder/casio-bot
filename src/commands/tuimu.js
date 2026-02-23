@@ -13,7 +13,7 @@ const User = require("../models/User");
 
 const PRICE_PER_BAG = 10000;
 const MAX_BAGS = 100;
-const WIN_RATE = 0.4; // 🔥 40% trúng = 60% xịt
+const WIN_PERCENT = 40; // 40% trúng = 60% xịt
 
 const games = new Map();
 
@@ -32,7 +32,7 @@ module.exports = {
     if (user.banned) {
       return interaction.reply({
         content: "⛔ Bạn đã bị cấm khỏi hệ thống!",
-        flags: 64,
+        ephemeral: true,
       });
     }
 
@@ -62,14 +62,14 @@ module.exports = {
     if (isNaN(amount) || amount <= 0) {
       return interaction.reply({
         content: "❌ Số lượng không hợp lệ!",
-        flags: 64,
+        ephemeral: true,
       });
     }
 
     if (amount > MAX_BAGS) {
       return interaction.reply({
         content: "❌ Bạn chỉ được mua tối đa 100 túi!",
-        flags: 64,
+        ephemeral: true,
       });
     }
 
@@ -83,7 +83,7 @@ module.exports = {
         content: `❌ Bạn không đủ tiền! Cần ${totalCost.toLocaleString(
           "vi-VN"
         )} VND`,
-        flags: 64,
+        ephemeral: true,
       });
     }
 
@@ -111,12 +111,10 @@ module.exports = {
     const msg = await interaction.reply({
       embeds: [embed],
       components: [row],
-      withResponse: true,
+      fetchReply: true,
     });
 
-    const message = msg.resource.message;
-
-    games.set(message.id, {
+    games.set(msg.id, {
       userId: interaction.user.id,
       amount,
       totalCost,
@@ -132,7 +130,7 @@ module.exports = {
       if (interaction.user.id !== game.userId) {
         return interaction.reply({
           content: "❌ Đây không phải túi của bạn!",
-          flags: 64,
+          ephemeral: true,
         });
       }
 
@@ -143,7 +141,8 @@ module.exports = {
       let totalReward = 0;
 
       for (let i = 1; i <= game.amount; i++) {
-        const win = Math.random() < WIN_RATE; // 🔥 60% xịt
+        const win =
+          Math.floor(Math.random() * 100) < WIN_PERCENT;
 
         if (win) {
           const reward = Math.floor(
@@ -183,26 +182,27 @@ module.exports = {
         .setFooter({ text: "BOT Casino 💎" })
         .setTimestamp();
 
-      const row =
-        game.amount > 50
-          ? new ActionRowBuilder().addComponents(
-              new ButtonBuilder()
-                .setCustomId("tuimu_page2")
-                .setLabel("➡️ Trang 2")
-                .setStyle(ButtonStyle.Primary)
-            )
-          : [];
+      let components = [];
+
+      if (game.amount > 50) {
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId("tuimu_page2")
+            .setLabel("➡️ Trang 2")
+            .setStyle(ButtonStyle.Primary)
+        );
+        components.push(row);
+      }
 
       await interaction.update({
         embeds: [embed],
-        components: row ? [row] : [],
+        components: components,
       });
 
-      // ⏳ Tự xoá toàn bộ tin nhắn sau 30s
       setTimeout(async () => {
         try {
           await interaction.message.delete();
-          games.delete(interaction.message.id); // xoá luôn khỏi memory
+          games.delete(interaction.message.id);
         } catch (err) {}
       }, 30000);
     }
@@ -224,7 +224,10 @@ module.exports = {
         .setFooter({ text: "BOT Casino 💎" })
         .setTimestamp();
 
-      await interaction.update({ embeds: [embed] });
+      await interaction.update({
+        embeds: [embed],
+        components: [],
+      });
     }
   },
 };
