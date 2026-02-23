@@ -53,7 +53,7 @@ module.exports = {
       .setDescription(
         `💸 Bạn đã trả **${amount.toLocaleString()} VND** cho <@${lenderId}>`
       )
-      .setFooter({ text: "HOP-BOT Casino 💎" })
+      .setFooter({ text: "BOT Casino 💎" })
       .setTimestamp();
 
     await interaction.reply({ embeds: [embed] });
