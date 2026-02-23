@@ -205,7 +205,7 @@ async function finishFight(message, winnerSide) {
       `🥇 **Gà thắng:** 🐔 ${winnerSide === "red" ? "Gà Đỏ 🔴" : "Gà Đen ⚫"}\n\n` +
       `💰 **Người thắng:**\n${winners.join("\n") || "Không ai 😭"}`
     )
-    .setFooter({ text: "HOP-BOT Casino 💎" })
+    .setFooter({ text: "BOT Casino 💎" })
     .setTimestamp();
 
   await message.edit({
