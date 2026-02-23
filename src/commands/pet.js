@@ -316,14 +316,21 @@ if (interaction.customId === "pet_bag") {
   if (!user.pet)
     return interaction.reply({ content: "❌ Bạn chưa có pet!", flags: 64 });
 
-  const p = user.pet;
-  const key = p.id;
+const p = user.pet;
+let key = p.id;
 
-  if (!PET_TYPES[key])
-    return interaction.reply({
-      content: "❌ Pet bị lỗi dữ liệu (id không hợp lệ).",
-      flags: 64,
-    });
+// 🔥 Nếu id chứa _dragon thì cắt bỏ
+if (key && key.includes("_")) {
+  key = key.split("_")[0];
+}
+
+if (!PET_TYPES[key]) {
+  console.log("INVALID PET ID:", p.id);
+  return interaction.reply({
+    content: "❌ Pet bị lỗi dữ liệu (id không tồn tại trong PET_TYPES).",
+    flags: 64,
+  });
+}
 
   const stage = getPetStage(key, p.level);
 
