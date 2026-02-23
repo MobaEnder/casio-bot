@@ -28,7 +28,7 @@ function getCrashChance(floor) {
   return 20;
 }
 
-// 💰 TÍNH HỆ SỐ NHÂN THEO TẦNG
+// 💰 HỆ SỐ NHÂN
 function getMultiplier(floor) {
   return 1 + floor * 0.25;
 }
@@ -73,18 +73,18 @@ module.exports = {
       .setDescription(
         `💰 Tiền cược: **${bet.toLocaleString("vi-VN")} VND**\n\n` +
         `📍 Đang ở tầng: **0**\n` +
-        `👉 Nhấn **ĐÀO** để bắt đầu!`
+        `👉 Nhấn ĐÀO để bắt đầu!`
       )
       .setFooter({ text: "BOT Casino 💎" })
       .setTimestamp();
 
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
-        .setCustomId("dao_continue")
+        .setCustomId("daoham_continue")
         .setLabel("⛏️ ĐÀO")
         .setStyle(ButtonStyle.Success),
       new ButtonBuilder()
-        .setCustomId("dao_cashout")
+        .setCustomId("daoham_cashout")
         .setLabel("💰 RÚT TIỀN")
         .setStyle(ButtonStyle.Primary)
         .setDisabled(true)
@@ -104,21 +104,18 @@ module.exports = {
   },
 
   async handleButton(interaction) {
+    await interaction.deferUpdate();
+
     const game = games.get(interaction.message.id);
     if (!game) return;
 
-    if (interaction.user.id !== game.userId) {
-      return interaction.reply({
-        content: "❌ Không phải lượt của bạn!",
-        ephemeral: true,
-      });
-    }
+    if (interaction.user.id !== game.userId) return;
 
     let user = await User.findOne({ userId: interaction.user.id });
     if (!user) return;
 
     // ⛏️ ĐÀO
-    if (interaction.customId === "dao_continue") {
+    if (interaction.customId === "daoham_continue") {
       game.floor++;
 
       const crashChance = getCrashChance(game.floor);
@@ -129,13 +126,13 @@ module.exports = {
           .setColor(0xff0000)
           .setTitle("💥 XẬP HẦM!")
           .setDescription(
-            `📍 Bạn đã chết ở tầng **${game.floor}**\n` +
-            `💀 Mất toàn bộ: **${game.bet.toLocaleString("vi-VN")} VND**\n` +
-            `🎯 Tỉ lệ xập tầng này: **${crashChance.toFixed(2)}%**`
+            `📍 Bạn chết ở tầng **${game.floor}**\n` +
+            `💀 Mất: **${game.bet.toLocaleString("vi-VN")} VND**\n` +
+            `🎯 Tỉ lệ xập: **${crashChance.toFixed(2)}%**`
           )
           .setTimestamp();
 
-        await interaction.update({
+        await interaction.editReply({
           embeds: [embed],
           components: [],
         });
@@ -158,7 +155,7 @@ module.exports = {
           )
           .setTimestamp();
 
-        await interaction.update({
+        await interaction.editReply({
           embeds: [embed],
           components: [],
         });
@@ -182,23 +179,23 @@ module.exports = {
 
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-          .setCustomId("dao_continue")
+          .setCustomId("daoham_continue")
           .setLabel("⛏️ ĐÀO TIẾP")
           .setStyle(ButtonStyle.Success),
         new ButtonBuilder()
-          .setCustomId("dao_cashout")
+          .setCustomId("daoham_cashout")
           .setLabel("💰 RÚT TIỀN")
           .setStyle(ButtonStyle.Primary)
       );
 
-      await interaction.update({
+      await interaction.editReply({
         embeds: [embed],
         components: [row],
       });
     }
 
     // 💰 RÚT TIỀN
-    if (interaction.customId === "dao_cashout") {
+    if (interaction.customId === "daoham_cashout") {
       const multiplier = getMultiplier(game.floor);
       const reward = Math.floor(game.bet * multiplier);
 
@@ -214,7 +211,7 @@ module.exports = {
         )
         .setTimestamp();
 
-      await interaction.update({
+      await interaction.editReply({
         embeds: [embed],
         components: [],
       });
