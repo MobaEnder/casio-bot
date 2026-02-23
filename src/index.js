@@ -149,7 +149,7 @@ client.on(Events.InteractionCreate, async interaction => {
       if (interaction.customId.startsWith("daoham_modal_") && daoham.handleModal)
         return await daoham.handleModal(interaction);
 
-      if (interaction.customId.startsWith("tuimu_") && tuimu.handleModal)
+      if (interaction.customId.startsWith("tuimu_modal_") && tuimu.handleModal)
         return await tuimu.handleModal(interaction);
       
     }
