@@ -294,107 +294,87 @@ if (interaction.customId.startsWith("pet_buy_")) {
 // 🛒 XỬ LÝ KHI SUBMIT MODAL
 ////////////////////////////////////////////////////
 
-if (interaction.customId.startsWith("pet_buy_confirm_")) {
-  const index = Number(interaction.customId.split("_")[3]);
-  const quantity = Number(interaction.fields.getTextInputValue("buy_quantity"));
+if (interaction.isModalSubmit() && interaction.customId.startsWith("pet_buy_confirm_")) {
 
-  if (!quantity || quantity <= 0)
-    return interaction.reply({ content: "❌ Số lượng không hợp lệ!", flags: 64 });
+  await interaction.deferReply(); // 🔥 QUAN TRỌNG
 
-  const shop = await getShop();
-  const item = shop.items[index];
+  try {
 
-  if (!item)
-    return interaction.reply({ content: "❌ Item không tồn tại!", flags: 64 });
+    const index = Number(interaction.customId.split("_")[3]);
+    const quantity = Number(interaction.fields.getTextInputValue("buy_quantity"));
 
-  if (!user.pet)
-    return interaction.reply({ content: "❌ Bạn chưa có pet!", flags: 64 });
+    if (!quantity || quantity <= 0)
+      return interaction.editReply({ content: "❌ Số lượng không hợp lệ!" });
 
-  const totalPrice = item.price * quantity;
-  const totalExp = item.exp * quantity;
+    const shop = await getShop();
+    const item = shop.items[index];
 
-  if (user.money < totalPrice)
-    return interaction.reply({ content: "❌ Không đủ tiền!", flags: 64 });
+    if (!item)
+      return interaction.editReply({ content: "❌ Item không tồn tại!" });
 
-  ////////////////////////////////////////////////////
-  // 💰 TRỪ TIỀN + CỘNG EXP
-  ////////////////////////////////////////////////////
+    if (!user.pet)
+      return interaction.editReply({ content: "❌ Bạn chưa có pet!" });
 
-  user.money -= totalPrice;
-  user.pet.exp += totalExp;
+    const totalPrice = item.price * quantity;
+    const totalExp = item.exp * quantity;
 
-  let levelUpLog = "";
-  let levelUpCount = 0;
+    if (user.money < totalPrice)
+      return interaction.editReply({ content: "❌ Không đủ tiền!" });
 
-  let key = user.pet.id?.split("_")[0];
+    user.money -= totalPrice;
+    user.pet.exp += totalExp;
 
-  if (!PET_TYPES[key])
-    return interaction.reply({
-      content: `❌ Pet id "${user.pet.id}" không hợp lệ.`,
-      flags: 64,
-    });
+    let levelUpLog = "";
+    let levelUpCount = 0;
 
-  ////////////////////////////////////////////////////
-  // 🔥 LEVEL UP LOOP
-  ////////////////////////////////////////////////////
+    let key = user.pet.id?.split("_")[0];
 
-  while (user.pet.exp >= user.pet.expNeeded) {
-    user.pet.exp -= user.pet.expNeeded;
-    user.pet.level++;
-    levelUpCount++;
+    while (user.pet.exp >= user.pet.expNeeded) {
+      user.pet.exp -= user.pet.expNeeded;
+      user.pet.level++;
+      levelUpCount++;
 
-    user.pet.expNeeded = expFormula(user.pet.level);
+      user.pet.expNeeded = expFormula(user.pet.level);
 
-    const rand = () => Math.floor(Math.random() * 3) + 1;
+      const rand = () => Math.floor(Math.random() * 3) + 1;
 
-    const hpUp = rand();
-    const atkUp = rand();
-    const defUp = rand();
-    const spdUp = rand();
+      const hpUp = rand();
+      const atkUp = rand();
+      const defUp = rand();
+      const spdUp = rand();
 
-    user.pet.stats.hp += hpUp;
-    user.pet.stats.atk += atkUp;
-    user.pet.stats.def += defUp;
-    user.pet.stats.spd += spdUp;
+      user.pet.stats.hp += hpUp;
+      user.pet.stats.atk += atkUp;
+      user.pet.stats.def += defUp;
+      user.pet.stats.spd += spdUp;
 
-    levelUpLog +=
-      `\nLevel ${user.pet.level} → ` +
-      `❤️ +${hpUp} | ⚔️ +${atkUp} | 🛡️ +${defUp} | 💨 +${spdUp}`;
-
-    if (user.pet.level === 30 || user.pet.level === 60) {
-      levelUpLog += `\n🌟 Tiến hóa tại level ${user.pet.level}!`;
+      levelUpLog +=
+        `\nLevel ${user.pet.level} → ❤️ +${hpUp} | ⚔️ +${atkUp} | 🛡️ +${defUp} | 💨 +${spdUp}`;
     }
+
+    await user.save();
+
+    const embed = new EmbedBuilder()
+      .setColor("#00ff99")
+      .setTitle("🎉 GIAO DỊCH THÀNH CÔNG!")
+      .setDescription(
+        `🛒 Mua: **${item.name} x${quantity}**\n` +
+        `💰 Tổng trừ: ${totalPrice.toLocaleString("vi-VN")} ₫\n` +
+        `💳 Số dư: ${user.money.toLocaleString("vi-VN")} ₫\n\n` +
+        `🔥 Nhận: +${totalExp.toLocaleString("vi-VN")} EXP\n\n` +
+        `🐲 Level hiện tại: ${user.pet.level}`
+      )
+      .addFields({
+        name: levelUpCount > 0 ? `✨ LÊN ${levelUpCount} LEVEL` : "📊 Không lên cấp",
+        value: levelUpCount > 0 ? levelUpLog : "Pet chưa đủ EXP",
+      });
+
+    await interaction.editReply({ embeds: [embed] });
+
+  } catch (err) {
+    console.error(err);
+    await interaction.editReply({ content: "❌ Đã xảy ra lỗi xử lý!" });
   }
-
-  await user.save();
-
-  ////////////////////////////////////////////////////
-  // 📊 EMBED RESULT
-  ////////////////////////////////////////////////////
-
-  const embed = new EmbedBuilder()
-    .setColor("#00ff99")
-    .setTitle("🎉 GIAO DỊCH THÀNH CÔNG!")
-    .setDescription(
-      `🛒 Mua: **${item.name} x${quantity}**\n` +
-      `💰 Tổng trừ: ${totalPrice.toLocaleString("vi-VN")} ₫\n` +
-      `💳 Số dư còn lại: ${user.money.toLocaleString("vi-VN")} ₫\n\n` +
-      `🔥 Nhận: +${totalExp.toLocaleString("vi-VN")} EXP\n\n` +
-      `🐲 Level hiện tại: ${user.pet.level}`
-    )
-    .addFields({
-      name:
-        levelUpCount > 0
-          ? `✨ LÊN ${levelUpCount} LEVEL`
-          : "📊 Không lên cấp",
-      value:
-        levelUpCount > 0
-          ? levelUpLog
-          : "Pet chưa đủ EXP để lên cấp",
-    });
-
-  const msg = await interaction.reply({ embeds: [embed], fetchReply: true });
-  setTimeout(() => msg.delete().catch(() => {}), 60000);
 }
     ////////////////////////////////////////////////////
     // BALO
