@@ -6,7 +6,7 @@ const {
 
 const shop = require("./pet/pet_shop");
 const balo = require("./pet/pet_balo");
-const main = require("./pet/pet_main");
+const main = require("./pet/pet_buy");
 
 module.exports = {
 
