@@ -169,7 +169,7 @@ module.exports = {
 
   //////////////////////////////////////////////////////
 
-  async handleButton(interaction) {
+  async handleButton(interaction, client) {
     let user = await User.findOne({ userId: interaction.user.id });
     if (!user) user = await User.create({ userId: interaction.user.id });
 
@@ -431,7 +431,7 @@ if (!PET_TYPES[key]) {
 
   //////////////////////////////////////////////////////
 
-  async handleModal(interaction) {
+  async handleModal(interaction, client) {
     if (!interaction.customId.startsWith("pet_name_")) return;
 
     let user = await User.findOne({ userId: interaction.user.id });
