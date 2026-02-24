@@ -8,6 +8,7 @@ const {
 const shop = require("./pet/pet_shop");
 const buy = require("./pet/pet_buy");
 const balo = require("./pet/pet_balo");
+const egg = require("./pet/pet_egg");
 
 module.exports = {
 
@@ -30,6 +31,11 @@ module.exports = {
         .setCustomId("pet_balo")
         .setLabel("🎒 Balo")
         .setStyle(ButtonStyle.Secondary)
+
+        new ButtonBuilder()
+  .setCustomId("pet_egg")
+  .setLabel("🥚 Nhận Pet")
+  .setStyle(ButtonStyle.Success)
     );
 
     return interaction.reply({
@@ -51,6 +57,12 @@ module.exports = {
 
     if (interaction.customId === "pet_buy_menu")
       return buy.handleButton(interaction);
+    
+    if (interaction.customId === "pet_egg")
+  return egg.handleButton(interaction);
+
+if (interaction.customId.startsWith("pet_choose_"))
+  return egg.handleChoose(interaction);
 
     if (interaction.customId === "pet_menu_back") {
 
@@ -81,6 +93,9 @@ module.exports = {
 
     if (interaction.customId === "pet_buy_confirm")
       return buy.handleModal(interaction);
+
+    if (interaction.customId.startsWith("pet_create_"))
+  return egg.handleModal(interaction);
 
   }
 
