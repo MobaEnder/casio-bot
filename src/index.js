@@ -133,6 +133,9 @@ client.on(Events.InteractionCreate, async interaction => {
 
       if (interaction.customId.startsWith("baicao_") && baicao.handleButton)
         return await baicao.handleButton(interaction);
+
+      if (interaction.customId.startsWith("pet_") && pet.handleButton)
+        return await pet.handleButton(interaction);
     }
 
     // ================= MODAL =================
@@ -170,6 +173,9 @@ client.on(Events.InteractionCreate, async interaction => {
 
       if (interaction.customId.startsWith("baicao_") && baicao.handleModal)
         return await baicao.handleModal(interaction);
+
+      if (interaction.customId.startsWith("pet_") && pet.handleModal)
+        return await pet.handleModal(interaction);
     }
 
   } catch (error) {
