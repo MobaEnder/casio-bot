@@ -1,6 +1,6 @@
-const shop = require("../pet/pet_shop");
-const balo = require("../pet/pet_balo");
-const buy = require("../pet/pet_buy");
+const shop = require("./pet/pet_shop");
+const balo = require("./pet/pet_balo");
+const main = require("./pet/pet_main");
 
 module.exports = {
 
