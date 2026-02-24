@@ -104,12 +104,25 @@ function createExpBar(current, max) {
 //////////////////////////////////////////////////////
 
 const SHOP_ITEMS = [
+  // ⭐ Item gốc
   { name: "Cỏ Ánh Sáng", price: 1_000_000, exp: 300 },
   { name: "Trái Ma Thuật", price: 2_000_000, exp: 600 },
   { name: "Tinh Thạch", price: 5_000_000, exp: 1500 },
   { name: "Lõi Thú", price: 10_000_000, exp: 3000 },
   { name: "Ngọc Hỏa", price: 20_000_000, exp: 6000 },
   { name: "Tim Rồng", price: 50_000_000, exp: 15000 },
+
+  // 🔥 10 item mới (không trùng giá, <= 100m)
+  { name: "Hoa Linh Hồn", price: 3_000_000, exp: 900 },
+  { name: "Mảnh Ngọc Cổ", price: 7_000_000, exp: 2100 },
+  { name: "Hạch Năng Lượng", price: 12_000_000, exp: 3600 },
+  { name: "Tinh Hoa Lửa", price: 15_000_000, exp: 4500 },
+  { name: "Ngọc Thiên Nhiên", price: 25_000_000, exp: 7500 },
+  { name: "Hồn Thạch Nhỏ", price: 30_000_000, exp: 9000 },
+  { name: "Mảnh Vỡ Ma Thú", price: 40_000_000, exp: 12000 },
+  { name: "Tinh Phách Lửa", price: 60_000_000, exp: 18000 },
+  { name: "Huyết Tinh Nhỏ", price: 75_000_000, exp: 22500 },
+  { name: "Tinh Hạch Cổ Đại", price: 90_000_000, exp: 27000 },
 ];
 
 async function getShop() {
@@ -253,12 +266,41 @@ if (
       return;
     }
 
-    ////////////////////////////////////////////////////
-// BUY
+////////////////////////////////////////////////////
+// 🛒 BUY BUTTON → HIỆN MODAL
 ////////////////////////////////////////////////////
 
 if (interaction.customId.startsWith("pet_buy_")) {
   const index = Number(interaction.customId.split("_")[2]);
+
+  const modal = new ModalBuilder()
+    .setCustomId(`pet_buy_confirm_${index}`)
+    .setTitle("🛒 Nhập số lượng muốn mua");
+
+  const quantityInput = new TextInputBuilder()
+    .setCustomId("buy_quantity")
+    .setLabel("Bạn muốn mua bao nhiêu?")
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder("Ví dụ: 5")
+    .setRequired(true);
+
+  const row = new ActionRowBuilder().addComponents(quantityInput);
+  modal.addComponents(row);
+
+  return interaction.showModal(modal);
+}
+
+////////////////////////////////////////////////////
+// 🛒 XỬ LÝ KHI SUBMIT MODAL
+////////////////////////////////////////////////////
+
+if (interaction.customId.startsWith("pet_buy_confirm_")) {
+  const index = Number(interaction.customId.split("_")[3]);
+  const quantity = Number(interaction.fields.getTextInputValue("buy_quantity"));
+
+  if (!quantity || quantity <= 0)
+    return interaction.reply({ content: "❌ Số lượng không hợp lệ!", flags: 64 });
+
   const shop = await getShop();
   const item = shop.items[index];
 
@@ -268,15 +310,22 @@ if (interaction.customId.startsWith("pet_buy_")) {
   if (!user.pet)
     return interaction.reply({ content: "❌ Bạn chưa có pet!", flags: 64 });
 
-  if (user.money < item.price)
+  const totalPrice = item.price * quantity;
+  const totalExp = item.exp * quantity;
+
+  if (user.money < totalPrice)
     return interaction.reply({ content: "❌ Không đủ tiền!", flags: 64 });
 
-  user.money -= item.price;
-  user.pet.exp += item.exp;
+  ////////////////////////////////////////////////////
+  // 💰 TRỪ TIỀN + CỘNG EXP
+  ////////////////////////////////////////////////////
+
+  user.money -= totalPrice;
+  user.pet.exp += totalExp;
 
   let levelUpLog = "";
+  let levelUpCount = 0;
 
-  // 🔥 LẤY KEY ĐÚNG
   let key = user.pet.id?.split("_")[0];
 
   if (!PET_TYPES[key])
@@ -285,15 +334,18 @@ if (interaction.customId.startsWith("pet_buy_")) {
       flags: 64,
     });
 
+  ////////////////////////////////////////////////////
+  // 🔥 LEVEL UP LOOP
+  ////////////////////////////////////////////////////
+
   while (user.pet.exp >= user.pet.expNeeded) {
     user.pet.exp -= user.pet.expNeeded;
     user.pet.level++;
+    levelUpCount++;
+
     user.pet.expNeeded = expFormula(user.pet.level);
 
-    // 🔥 RANDOM 1-3 ALL STATS
     const rand = () => Math.floor(Math.random() * 3) + 1;
-
-    const oldStats = { ...user.pet.stats };
 
     const hpUp = rand();
     const atkUp = rand();
@@ -306,36 +358,44 @@ if (interaction.customId.startsWith("pet_buy_")) {
     user.pet.stats.spd += spdUp;
 
     levelUpLog +=
-      `\n\n✨ **LÊN LEVEL ${user.pet.level}!**\n` +
-      `❤️ HP: ${oldStats.hp} → ${user.pet.stats.hp} (+${hpUp})\n` +
-      `⚔️ ATK: ${oldStats.atk} → ${user.pet.stats.atk} (+${atkUp})\n` +
-      `🛡️ DEF: ${oldStats.def} → ${user.pet.stats.def} (+${defUp})\n` +
-      `💨 SPD: ${oldStats.spd} → ${user.pet.stats.spd} (+${spdUp})`;
+      `\nLevel ${user.pet.level} → ` +
+      `❤️ +${hpUp} | ⚔️ +${atkUp} | 🛡️ +${defUp} | 💨 +${spdUp}`;
 
     if (user.pet.level === 30 || user.pet.level === 60) {
-      levelUpLog += `\n\n🌟 PET ĐÃ TIẾN HÓA TẠI LEVEL ${user.pet.level}!`;
+      levelUpLog += `\n🌟 Tiến hóa tại level ${user.pet.level}!`;
     }
   }
 
   await user.save();
 
+  ////////////////////////////////////////////////////
+  // 📊 EMBED RESULT
+  ////////////////////////////////////////////////////
+
   const embed = new EmbedBuilder()
     .setColor("#00ff99")
     .setTitle("🎉 GIAO DỊCH THÀNH CÔNG!")
     .setDescription(
-      `🛒 Bạn đã mua **${item.name}**\n\n` +
-      `💰 Trừ: ${item.price.toLocaleString("vi-VN")} ₫\n` +
+      `🛒 Mua: **${item.name} x${quantity}**\n` +
+      `💰 Tổng trừ: ${totalPrice.toLocaleString("vi-VN")} ₫\n` +
       `💳 Số dư còn lại: ${user.money.toLocaleString("vi-VN")} ₫\n\n` +
-      `🔥 Nhận: +${item.exp} EXP\n\n` +
-      `🐲 Pet hiện tại: Level ${user.pet.level}` +
-      levelUpLog
-    );
+      `🔥 Nhận: +${totalExp.toLocaleString("vi-VN")} EXP\n\n` +
+      `🐲 Level hiện tại: ${user.pet.level}`
+    )
+    .addFields({
+      name:
+        levelUpCount > 0
+          ? `✨ LÊN ${levelUpCount} LEVEL`
+          : "📊 Không lên cấp",
+      value:
+        levelUpCount > 0
+          ? levelUpLog
+          : "Pet chưa đủ EXP để lên cấp",
+    });
 
   const msg = await interaction.reply({ embeds: [embed], fetchReply: true });
   setTimeout(() => msg.delete().catch(() => {}), 60000);
-  return;
 }
-
     ////////////////////////////////////////////////////
     // BALO
     ////////////////////////////////////////////////////
