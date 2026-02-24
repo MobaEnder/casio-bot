@@ -22,9 +22,9 @@ const PET_CONFIG = {
     color: 0xff4500,
     stats: { hp: 120, atk: 20, def: 8, spd: 10 },
     images: {
-      1: "FIRE_LV1_URL",
-      30: "FIRE_LV30_URL",
-      60: "FIRE_LV60_URL"
+      1: "https://static.wikia.nocookie.net/dragoncity/images/b/b2/Heatwave_Dragon_1.png/revision/latest?cb=20240607143449",
+      30: "https://static.wikia.nocookie.net/dragoncity/images/8/8a/Heatwave_Dragon_2.png/revision/latest?cb=20240607143513",
+      60: "https://static.wikia.nocookie.net/dragoncity/images/0/03/Burning_Dragon_.png/revision/latest?cb=20140219112656"
     }
   },
 
@@ -35,9 +35,9 @@ const PET_CONFIG = {
     color: 0x0099ff,
     stats: { hp: 150, atk: 12, def: 18, spd: 8 },
     images: {
-      1: "WATER_LV1_URL",
-      30: "WATER_LV30_URL",
-      60: "WATER_LV60_URL"
+      1: "https://static.wikia.nocookie.net/dragoncity/images/b/b9/Elements_Dragon_1.png/revision/latest?cb=20250609023334",
+      30: "https://static.wikia.nocookie.net/dragoncity/images/2/2d/Elements_Dragon_2.png/revision/latest?cb=20140610174414",
+      60: "https://static.wikia.nocookie.net/dragoncity/images/4/47/Elements_Dragon_3.png/revision/latest?cb=20250609023547"
     }
   },
 
@@ -48,9 +48,9 @@ const PET_CONFIG = {
     color: 0xffd700,
     stats: { hp: 100, atk: 15, def: 10, spd: 20 },
     images: {
-      1: "ELECTRIC_LV1_URL",
-      30: "ELECTRIC_LV30_URL",
-      60: "ELECTRIC_LV60_URL"
+      1: "https://static.wikia.nocookie.net/dragoncity/images/a/ad/Electric_Dragon_1.png/revision/latest?cb=20250120094618",
+      30: "https://static.wikia.nocookie.net/dragoncity/images/5/5a/Electric_Dragon_2.png/revision/latest?cb=20250120094651",
+      60: "https://static.wikia.nocookie.net/dragoncity/images/f/f0/Electric_Dragon_3.png/revision/latest?cb=20250120094737"
     }
   }
 };
