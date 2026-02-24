@@ -9,35 +9,54 @@ const {
 } = require("discord.js");
 
 const User = require("../../models/User");
-const PetEvolution = require("../../models/PetEvolution");
 
 //////////////////////////////////////////////////////
-// 🎨 PET BASE CONFIG (KHÔNG LƯU ẢNH Ở ĐÂY)
+// 🎨 PET CONFIG
 //////////////////////////////////////////////////////
 
-const PET_BASE = {
+const PET_CONFIG = {
   fire_dragon: {
+    id: "fire_dragon",
     element: "fire",
     icon: "🔥",
     color: 0xff4500,
-    stats: { hp: 120, atk: 20, def: 8, spd: 10 }
+    stats: { hp: 120, atk: 20, def: 8, spd: 10 },
+    images: {
+      1: "https://static.wikia.nocookie.net/dragoncity/images/b/b2/Heatwave_Dragon_1.png/revision/latest?cb=20240607143449",
+      30: "https://static.wikia.nocookie.net/dragoncity/images/8/8a/Heatwave_Dragon_2.png/revision/latest?cb=20240607143513",
+      60: "https://static.wikia.nocookie.net/dragoncity/images/0/03/Burning_Dragon_.png/revision/latest?cb=20140219112656"
+    }
   },
+
   water_dragon: {
+    id: "water_dragon",
     element: "water",
     icon: "🌊",
     color: 0x0099ff,
-    stats: { hp: 150, atk: 12, def: 18, spd: 8 }
+    stats: { hp: 150, atk: 12, def: 18, spd: 8 },
+    images: {
+      1: "https://static.wikia.nocookie.net/dragoncity/images/b/b9/Elements_Dragon_1.png/revision/latest?cb=20250609023334",
+      30: "https://static.wikia.nocookie.net/dragoncity/images/2/2d/Elements_Dragon_2.png/revision/latest?cb=20140610174414",
+      60: "https://static.wikia.nocookie.net/dragoncity/images/4/47/Elements_Dragon_3.png/revision/latest?cb=20250609023547"
+    }
   },
+
   electric_dragon: {
+    id: "electric_dragon",
     element: "electric",
     icon: "⚡",
     color: 0xffd700,
-    stats: { hp: 100, atk: 15, def: 10, spd: 20 }
+    stats: { hp: 100, atk: 15, def: 10, spd: 20 },
+    images: {
+      1: "https://static.wikia.nocookie.net/dragoncity/images/a/ad/Electric_Dragon_1.png/revision/latest?cb=20250120094618",
+      30: "https://static.wikia.nocookie.net/dragoncity/images/5/5a/Electric_Dragon_2.png/revision/latest?cb=20250120094651",
+      60: "https://static.wikia.nocookie.net/dragoncity/images/f/f0/Electric_Dragon_3.png/revision/latest?cb=20250120094737"
+    }
   }
 };
 
 //////////////////////////////////////////////////////
-// 🥚 BUTTON CHỌN PET
+// 🥚 HANDLE BUTTON
 //////////////////////////////////////////////////////
 
 module.exports = {
@@ -78,7 +97,7 @@ module.exports = {
   },
 
 //////////////////////////////////////////////////////
-// 🐲 CHỌN HỆ → MODAL
+// 🐲 CHỌN HỆ → MODAL ĐẶT TÊN
 //////////////////////////////////////////////////////
 
   async handleChoose(interaction) {
@@ -104,7 +123,7 @@ module.exports = {
   },
 
 //////////////////////////////////////////////////////
-// 🐉 TẠO PET + LẤY ẢNH TỪ PetEvolution
+// 🐉 TẠO PET
 //////////////////////////////////////////////////////
 
   async handleModal(interaction) {
@@ -112,7 +131,7 @@ module.exports = {
     if (!interaction.customId.startsWith("pet_create_")) return;
 
     const type = interaction.customId.replace("pet_create_", "");
-    const config = PET_BASE[type];
+    const config = PET_CONFIG[type];
     const petName = interaction.fields.getTextInputValue("pet_name");
 
     let user = await User.findOne({ userId: interaction.user.id });
@@ -122,7 +141,7 @@ module.exports = {
     }
 
     user.pet = {
-      id: type,
+      id: config.id,
       name: petName,
       element: config.element,
       race: "dragon",
@@ -136,18 +155,11 @@ module.exports = {
 
     await user.save();
 
-    // 🔥 LẤY ẢNH LV1 TỪ DB
-    const evo = await PetEvolution.findOne({
-      petId: type,
-      level: 1
-    });
-
     const embed = new EmbedBuilder()
       .setTitle(`${config.icon} ${petName}`)
       .setDescription(`Hệ: **${config.element.toUpperCase()}**\nLevel: 1`)
-      .setColor(config.color);
-
-    if (evo?.image) embed.setThumbnail(evo.image);
+      .setColor(config.color)
+      .setThumbnail(config.images[1]);
 
     return interaction.reply({ embeds: [embed] });
   }

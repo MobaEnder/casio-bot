@@ -1,11 +1,14 @@
 const {
   ActionRowBuilder,
   ButtonBuilder,
-  ButtonStyle
+  ButtonStyle,
+  EmbedBuilder
 } = require("discord.js");
 
+const PetShop = require("../../models/PetShop"); // sửa path nếu cần
+
 //////////////////////////////////////////////////////
-// 🏪 SHOP DATA
+// 🏪 SHOP DATA (FULL POOL)
 //////////////////////////////////////////////////////
 
 const SHOP_ITEMS = [
@@ -15,7 +18,6 @@ const SHOP_ITEMS = [
   { name: "Lõi Thú", price: 10_000_000, exp: 3000 },
   { name: "Ngọc Hỏa", price: 20_000_000, exp: 6000 },
   { name: "Tim Rồng", price: 50_000_000, exp: 15000 },
-
   { name: "Hoa Linh Hồn", price: 3_000_000, exp: 900 },
   { name: "Mảnh Ngọc Cổ", price: 7_000_000, exp: 2100 },
   { name: "Hạch Năng Lượng", price: 12_000_000, exp: 3600 },
@@ -29,18 +31,74 @@ const SHOP_ITEMS = [
 ];
 
 //////////////////////////////////////////////////////
-// 🏪 HANDLE SHOP BUTTON
+// 🎲 RANDOM 6 ITEM
+//////////////////////////////////////////////////////
+
+function getRandomItems() {
+  const shuffled = [...SHOP_ITEMS].sort(() => 0.5 - Math.random());
+  return shuffled.slice(0, 6);
+}
+
+//////////////////////////////////////////////////////
+// 🏪 GET SHOP (RESET SAU 1 TIẾNG)
+//////////////////////////////////////////////////////
+
+async function getShop() {
+  let shop = await PetShop.findOne();
+
+  const ONE_HOUR = 60 * 60 * 1000;
+
+  if (!shop) {
+    shop = await PetShop.create({
+      items: getRandomItems(),
+      lastReset: new Date()
+    });
+    return shop;
+  }
+
+  const now = Date.now();
+  const diff = now - new Date(shop.lastReset).getTime();
+
+  if (diff >= ONE_HOUR) {
+    shop.items = getRandomItems();
+    shop.lastReset = new Date();
+    await shop.save();
+  }
+
+  return shop;
+}
+
+//////////////////////////////////////////////////////
+// 🏪 HANDLE BUTTON
 //////////////////////////////////////////////////////
 
 module.exports = {
 
   async handleButton(interaction) {
 
-    let content = "🏪 **SHOP THÚ CƯNG**\n\n";
+    const shop = await getShop();
 
-    SHOP_ITEMS.forEach((item, index) => {
-      content += `**${index + 1}. ${item.name}**\n💰 ${item.price.toLocaleString()} | ⭐ ${item.exp} EXP\n\n`;
-    });
+    const remaining =
+      60 * 60 -
+      Math.floor((Date.now() - new Date(shop.lastReset)) / 1000);
+
+    const minutes = Math.floor(remaining / 60);
+    const seconds = remaining % 60;
+
+    const embed = new EmbedBuilder()
+      .setTitle("🏪 SHOP THÚ CƯNG")
+      .setDescription("✨ Reset mỗi 1 giờ")
+      .setColor(0xff9900)
+      .addFields(
+        shop.items.map((item, index) => ({
+          name: `🛒 ${index + 1}. ${item.name}`,
+          value: `💰 ${item.price.toLocaleString()} | ⭐ ${item.exp} EXP`,
+          inline: false
+        }))
+      )
+      .setFooter({
+        text: `⏳ Reset sau: ${minutes}m ${seconds}s`
+      });
 
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
@@ -55,10 +113,8 @@ module.exports = {
     );
 
     return interaction.update({
-      content,
+      embeds: [embed],
       components: [row]
     });
-  },
-
-  SHOP_ITEMS
+  }
 };
