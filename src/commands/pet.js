@@ -268,65 +268,85 @@ if (
 
 client.on("interactionCreate", async (interaction) => {
 
-  // =========================
+  ////////////////////////////////////////////////////////
   // BUTTON
-  // =========================
+  ////////////////////////////////////////////////////////
+
   if (interaction.isButton()) {
 
-    if (interaction.customId.startsWith("pet_buy_")) {
-      const index = Number(interaction.customId.split("_")[2]);
+    if (!interaction.customId.startsWith("pet_buy_")) return;
 
-      const modal = new ModalBuilder()
-        .setCustomId(`pet_buy_confirm_${index}`)
-        .setTitle("🛒 Nhập số lượng muốn mua");
+    const parts = interaction.customId.split("_");
+    if (parts.length < 3) return;
 
-      const quantityInput = new TextInputBuilder()
-        .setCustomId("buy_quantity")
-        .setLabel("Bạn muốn mua bao nhiêu?")
-        .setStyle(TextInputStyle.Short)
-        .setRequired(true);
+    const index = parseInt(parts[2]);
+    if (isNaN(index)) return;
 
-      const row = new ActionRowBuilder().addComponents(quantityInput);
-      modal.addComponents(row);
+    const modal = new ModalBuilder()
+      .setCustomId(`pet_buy_confirm_${index}`)
+      .setTitle("🛒 Nhập số lượng muốn mua");
 
-      return interaction.showModal(modal);
-    }
+    const quantityInput = new TextInputBuilder()
+      .setCustomId("buy_quantity")
+      .setLabel("Bạn muốn mua bao nhiêu?")
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true)
+      .setPlaceholder("Ví dụ: 5");
+
+    const row = new ActionRowBuilder().addComponents(quantityInput);
+    modal.addComponents(row);
+
+    return interaction.showModal(modal);
   }
 
-  // =========================
+  ////////////////////////////////////////////////////////
   // MODAL SUBMIT
-  // =========================
+  ////////////////////////////////////////////////////////
+
   if (interaction.isModalSubmit()) {
 
     if (!interaction.customId.startsWith("pet_buy_confirm_")) return;
 
-    await interaction.deferReply();
+    await interaction.deferReply({ ephemeral: false });
 
     try {
 
+      const parts = interaction.customId.split("_");
+      if (parts.length < 4)
+        return interaction.editReply("❌ Lỗi dữ liệu!");
+
+      const index = parseInt(parts[3]);
+      if (isNaN(index))
+        return interaction.editReply("❌ Lỗi dữ liệu!");
+
+      const quantityRaw = interaction.fields.getTextInputValue("buy_quantity");
+      const quantity = parseInt(quantityRaw);
+
+      if (isNaN(quantity) || quantity <= 0)
+        return interaction.editReply("❌ Số lượng không hợp lệ!");
+
       const user = await User.findOne({ userId: interaction.user.id });
-      if (!user) return interaction.editReply({ content: "❌ Không tìm thấy user." });
-
-      const index = Number(interaction.customId.split("_")[3]);
-      const quantity = Number(interaction.fields.getTextInputValue("buy_quantity"));
-
-      if (!quantity || quantity <= 0)
-        return interaction.editReply({ content: "❌ Số lượng không hợp lệ!" });
+      if (!user)
+        return interaction.editReply("❌ Không tìm thấy user.");
 
       const shop = await getShop();
+      if (!shop || !shop.items || !shop.items[index])
+        return interaction.editReply("❌ Item không tồn tại!");
+
       const item = shop.items[index];
 
-      if (!item)
-        return interaction.editReply({ content: "❌ Item không tồn tại!" });
-
       if (!user.pet)
-        return interaction.editReply({ content: "❌ Bạn chưa có pet!" });
+        return interaction.editReply("❌ Bạn chưa có pet!");
 
       const totalPrice = item.price * quantity;
       const totalExp = item.exp * quantity;
 
-      if (user.money < totalPrice)
-        return interaction.editReply({ content: "❌ Không đủ tiền!" });
+      if (!user.money || user.money < totalPrice)
+        return interaction.editReply("❌ Không đủ tiền!");
+
+      ////////////////////////////////////////////////////////
+      // TRỪ TIỀN + CỘNG EXP
+      ////////////////////////////////////////////////////////
 
       user.money -= totalPrice;
       user.pet.exp += totalExp;
@@ -335,9 +355,11 @@ client.on("interactionCreate", async (interaction) => {
       let levelUpCount = 0;
 
       while (user.pet.exp >= user.pet.expNeeded) {
+
         user.pet.exp -= user.pet.expNeeded;
         user.pet.level++;
         levelUpCount++;
+
         user.pet.expNeeded = expFormula(user.pet.level);
 
         const rand = () => Math.floor(Math.random() * 3) + 1;
@@ -358,6 +380,10 @@ client.on("interactionCreate", async (interaction) => {
 
       await user.save();
 
+      ////////////////////////////////////////////////////////
+      // EMBED KẾT QUẢ
+      ////////////////////////////////////////////////////////
+
       const embed = new EmbedBuilder()
         .setColor("#00ff99")
         .setTitle("🎉 GIAO DỊCH THÀNH CÔNG!")
@@ -369,17 +395,22 @@ client.on("interactionCreate", async (interaction) => {
           `🐲 Level hiện tại: ${user.pet.level}`
         )
         .addFields({
-          name: levelUpCount > 0 ? `✨ LÊN ${levelUpCount} LEVEL` : "📊 Không lên cấp",
-          value: levelUpCount > 0 ? levelUpLog : "Pet chưa đủ EXP",
+          name: levelUpCount > 0
+            ? `✨ LÊN ${levelUpCount} LEVEL`
+            : "📊 Không lên cấp",
+          value: levelUpCount > 0
+            ? levelUpLog
+            : "Pet chưa đủ EXP",
         });
 
-      await interaction.editReply({ embeds: [embed] });
+      return interaction.editReply({ embeds: [embed] });
 
     } catch (err) {
-      console.error(err);
-      await interaction.editReply({ content: "❌ Lỗi hệ thống!" });
+      console.error("PET BUY ERROR:", err);
+      return interaction.editReply("❌ Lỗi hệ thống!");
     }
   }
+
 });
     ////////////////////////////////////////////////////
     // BALO
