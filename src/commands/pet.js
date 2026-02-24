@@ -1,7 +1,8 @@
 const {
   ActionRowBuilder,
   ButtonBuilder,
-  ButtonStyle
+  ButtonStyle,
+  SlashCommandBuilder
 } = require("discord.js");
 
 const shop = require("./pet/pet_shop");
@@ -10,10 +11,9 @@ const balo = require("./pet/pet_balo");
 
 module.exports = {
 
-  data: {
-    name: "thucung",
-    description: "Quản lý thú cưng"
-  },
+  data: new SlashCommandBuilder()
+    .setName("thucung")
+    .setDescription("Quản lý thú cưng"),
 
   //////////////////////////////////////////////////////
   // 🚀 SLASH COMMAND
@@ -39,24 +39,21 @@ module.exports = {
   },
 
   //////////////////////////////////////////////////////
-  // 🔘 BUTTON HANDLER
+  // 🔘 BUTTON
   //////////////////////////////////////////////////////
   async handleButton(interaction) {
 
-    // MỞ SHOP
     if (interaction.customId === "pet_shop")
       return shop.handleButton(interaction);
 
-    // MỞ BALO
     if (interaction.customId === "pet_balo")
       return balo.handleButton(interaction);
 
-    // MỞ MODAL MUA
     if (interaction.customId === "pet_buy_menu")
       return buy.handleButton(interaction);
 
-    // QUAY LẠI MENU
     if (interaction.customId === "pet_menu_back") {
+
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId("pet_shop")
@@ -78,7 +75,7 @@ module.exports = {
   },
 
   //////////////////////////////////////////////////////
-  // 📝 MODAL HANDLER
+  // 📝 MODAL
   //////////////////////////////////////////////////////
   async handleModal(interaction) {
 
