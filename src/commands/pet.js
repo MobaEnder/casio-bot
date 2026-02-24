@@ -266,116 +266,121 @@ if (
       return;
     }
 
-////////////////////////////////////////////////////
-// 🛒 BUY BUTTON → HIỆN MODAL
-////////////////////////////////////////////////////
+client.on("interactionCreate", async (interaction) => {
 
-if (interaction.customId.startsWith("pet_buy_")) {
-  const index = Number(interaction.customId.split("_")[2]);
+  // =========================
+  // BUTTON
+  // =========================
+  if (interaction.isButton()) {
 
-  const modal = new ModalBuilder()
-    .setCustomId(`pet_buy_confirm_${index}`)
-    .setTitle("🛒 Nhập số lượng muốn mua");
+    if (interaction.customId.startsWith("pet_buy_")) {
+      const index = Number(interaction.customId.split("_")[2]);
 
-  const quantityInput = new TextInputBuilder()
-    .setCustomId("buy_quantity")
-    .setLabel("Bạn muốn mua bao nhiêu?")
-    .setStyle(TextInputStyle.Short)
-    .setPlaceholder("Ví dụ: 5")
-    .setRequired(true);
+      const modal = new ModalBuilder()
+        .setCustomId(`pet_buy_confirm_${index}`)
+        .setTitle("🛒 Nhập số lượng muốn mua");
 
-  const row = new ActionRowBuilder().addComponents(quantityInput);
-  modal.addComponents(row);
+      const quantityInput = new TextInputBuilder()
+        .setCustomId("buy_quantity")
+        .setLabel("Bạn muốn mua bao nhiêu?")
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true);
 
-  return interaction.showModal(modal);
-}
+      const row = new ActionRowBuilder().addComponents(quantityInput);
+      modal.addComponents(row);
 
-////////////////////////////////////////////////////
-// 🛒 XỬ LÝ KHI SUBMIT MODAL
-////////////////////////////////////////////////////
-
-if (interaction.isModalSubmit() && interaction.customId.startsWith("pet_buy_confirm_")) {
-
-  await interaction.deferReply(); // 🔥 QUAN TRỌNG
-
-  try {
-
-    const index = Number(interaction.customId.split("_")[3]);
-    const quantity = Number(interaction.fields.getTextInputValue("buy_quantity"));
-
-    if (!quantity || quantity <= 0)
-      return interaction.editReply({ content: "❌ Số lượng không hợp lệ!" });
-
-    const shop = await getShop();
-    const item = shop.items[index];
-
-    if (!item)
-      return interaction.editReply({ content: "❌ Item không tồn tại!" });
-
-    if (!user.pet)
-      return interaction.editReply({ content: "❌ Bạn chưa có pet!" });
-
-    const totalPrice = item.price * quantity;
-    const totalExp = item.exp * quantity;
-
-    if (user.money < totalPrice)
-      return interaction.editReply({ content: "❌ Không đủ tiền!" });
-
-    user.money -= totalPrice;
-    user.pet.exp += totalExp;
-
-    let levelUpLog = "";
-    let levelUpCount = 0;
-
-    let key = user.pet.id?.split("_")[0];
-
-    while (user.pet.exp >= user.pet.expNeeded) {
-      user.pet.exp -= user.pet.expNeeded;
-      user.pet.level++;
-      levelUpCount++;
-
-      user.pet.expNeeded = expFormula(user.pet.level);
-
-      const rand = () => Math.floor(Math.random() * 3) + 1;
-
-      const hpUp = rand();
-      const atkUp = rand();
-      const defUp = rand();
-      const spdUp = rand();
-
-      user.pet.stats.hp += hpUp;
-      user.pet.stats.atk += atkUp;
-      user.pet.stats.def += defUp;
-      user.pet.stats.spd += spdUp;
-
-      levelUpLog +=
-        `\nLevel ${user.pet.level} → ❤️ +${hpUp} | ⚔️ +${atkUp} | 🛡️ +${defUp} | 💨 +${spdUp}`;
+      return interaction.showModal(modal);
     }
-
-    await user.save();
-
-    const embed = new EmbedBuilder()
-      .setColor("#00ff99")
-      .setTitle("🎉 GIAO DỊCH THÀNH CÔNG!")
-      .setDescription(
-        `🛒 Mua: **${item.name} x${quantity}**\n` +
-        `💰 Tổng trừ: ${totalPrice.toLocaleString("vi-VN")} ₫\n` +
-        `💳 Số dư: ${user.money.toLocaleString("vi-VN")} ₫\n\n` +
-        `🔥 Nhận: +${totalExp.toLocaleString("vi-VN")} EXP\n\n` +
-        `🐲 Level hiện tại: ${user.pet.level}`
-      )
-      .addFields({
-        name: levelUpCount > 0 ? `✨ LÊN ${levelUpCount} LEVEL` : "📊 Không lên cấp",
-        value: levelUpCount > 0 ? levelUpLog : "Pet chưa đủ EXP",
-      });
-
-    await interaction.editReply({ embeds: [embed] });
-
-  } catch (err) {
-    console.error(err);
-    await interaction.editReply({ content: "❌ Đã xảy ra lỗi xử lý!" });
   }
-}
+
+  // =========================
+  // MODAL SUBMIT
+  // =========================
+  if (interaction.isModalSubmit()) {
+
+    if (!interaction.customId.startsWith("pet_buy_confirm_")) return;
+
+    await interaction.deferReply();
+
+    try {
+
+      const user = await User.findOne({ userId: interaction.user.id });
+      if (!user) return interaction.editReply({ content: "❌ Không tìm thấy user." });
+
+      const index = Number(interaction.customId.split("_")[3]);
+      const quantity = Number(interaction.fields.getTextInputValue("buy_quantity"));
+
+      if (!quantity || quantity <= 0)
+        return interaction.editReply({ content: "❌ Số lượng không hợp lệ!" });
+
+      const shop = await getShop();
+      const item = shop.items[index];
+
+      if (!item)
+        return interaction.editReply({ content: "❌ Item không tồn tại!" });
+
+      if (!user.pet)
+        return interaction.editReply({ content: "❌ Bạn chưa có pet!" });
+
+      const totalPrice = item.price * quantity;
+      const totalExp = item.exp * quantity;
+
+      if (user.money < totalPrice)
+        return interaction.editReply({ content: "❌ Không đủ tiền!" });
+
+      user.money -= totalPrice;
+      user.pet.exp += totalExp;
+
+      let levelUpLog = "";
+      let levelUpCount = 0;
+
+      while (user.pet.exp >= user.pet.expNeeded) {
+        user.pet.exp -= user.pet.expNeeded;
+        user.pet.level++;
+        levelUpCount++;
+        user.pet.expNeeded = expFormula(user.pet.level);
+
+        const rand = () => Math.floor(Math.random() * 3) + 1;
+
+        const hpUp = rand();
+        const atkUp = rand();
+        const defUp = rand();
+        const spdUp = rand();
+
+        user.pet.stats.hp += hpUp;
+        user.pet.stats.atk += atkUp;
+        user.pet.stats.def += defUp;
+        user.pet.stats.spd += spdUp;
+
+        levelUpLog +=
+          `\nLevel ${user.pet.level} → ❤️ +${hpUp} | ⚔️ +${atkUp} | 🛡️ +${defUp} | 💨 +${spdUp}`;
+      }
+
+      await user.save();
+
+      const embed = new EmbedBuilder()
+        .setColor("#00ff99")
+        .setTitle("🎉 GIAO DỊCH THÀNH CÔNG!")
+        .setDescription(
+          `🛒 Mua: **${item.name} x${quantity}**\n` +
+          `💰 Tổng trừ: ${totalPrice.toLocaleString("vi-VN")} ₫\n` +
+          `💳 Số dư: ${user.money.toLocaleString("vi-VN")} ₫\n\n` +
+          `🔥 Nhận: +${totalExp.toLocaleString("vi-VN")} EXP\n\n` +
+          `🐲 Level hiện tại: ${user.pet.level}`
+        )
+        .addFields({
+          name: levelUpCount > 0 ? `✨ LÊN ${levelUpCount} LEVEL` : "📊 Không lên cấp",
+          value: levelUpCount > 0 ? levelUpLog : "Pet chưa đủ EXP",
+        });
+
+      await interaction.editReply({ embeds: [embed] });
+
+    } catch (err) {
+      console.error(err);
+      await interaction.editReply({ content: "❌ Lỗi hệ thống!" });
+    }
+  }
+});
     ////////////////////////////////////////////////////
     // BALO
     ////////////////////////////////////////////////////
