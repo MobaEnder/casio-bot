@@ -1,3 +1,9 @@
+const {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle
+} = require("discord.js");
+
 const shop = require("./pet/pet_shop");
 const balo = require("./pet/pet_balo");
 const main = require("./pet/pet_main");
@@ -32,20 +38,17 @@ module.exports = {
   async handleButton(interaction) {
 
     if (interaction.customId === "pet_shop")
-      return shopHandler(interaction);
+      return shop.handleButton(interaction);
 
     if (interaction.customId === "pet_balo")
-      return baloHandler(interaction);
-
-    if (interaction.customId.startsWith("pet_buy_"))
-      return buyHandler.handleButton(interaction);
+      return balo.handleButton(interaction);
 
   },
 
   async handleModal(interaction) {
 
     if (interaction.customId.startsWith("pet_buy_confirm_"))
-      return buyHandler.handleModal(interaction);
+      return shop.handleModal(interaction);
 
   }
 
