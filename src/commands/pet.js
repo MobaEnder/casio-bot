@@ -30,12 +30,12 @@ module.exports = {
       new ButtonBuilder()
         .setCustomId("pet_balo")
         .setLabel("🎒 Balo")
-        .setStyle(ButtonStyle.Secondary)
+        .setStyle(ButtonStyle.Secondary), // ← PHẢI CÓ DẤU PHẨY
 
-        new ButtonBuilder()
-  .setCustomId("pet_egg")
-  .setLabel("🥚 Nhận Pet")
-  .setStyle(ButtonStyle.Success)
+      new ButtonBuilder()
+        .setCustomId("pet_egg")
+        .setLabel("🥚 Nhận Pet")
+        .setStyle(ButtonStyle.Success)
     );
 
     return interaction.reply({
@@ -57,37 +57,37 @@ module.exports = {
 
     if (interaction.customId === "pet_buy_menu")
       return buy.handleButton(interaction);
-    
+
     if (interaction.customId === "pet_egg")
-  return egg.handleButton(interaction);
+      return egg.handleButton(interaction);
 
-if (interaction.customId.startsWith("pet_choose_"))
-  return egg.handleChoose(interaction);
+    if (interaction.customId.startsWith("pet_choose_"))
+      return egg.handleChoose(interaction);
 
- if (interaction.customId === "pet_menu_back") {
+    if (interaction.customId === "pet_menu_back") {
 
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId("pet_shop")
-      .setLabel("🏪 Shop")
-      .setStyle(ButtonStyle.Primary),
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId("pet_shop")
+          .setLabel("🏪 Shop")
+          .setStyle(ButtonStyle.Primary),
 
-    new ButtonBuilder()
-      .setCustomId("pet_balo")
-      .setLabel("🎒 Balo")
-      .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+          .setCustomId("pet_balo")
+          .setLabel("🎒 Balo")
+          .setStyle(ButtonStyle.Secondary),
 
-    new ButtonBuilder()
-      .setCustomId("pet_egg")
-      .setLabel("🥚 Nhận Pet")
-      .setStyle(ButtonStyle.Success)
-  );
+        new ButtonBuilder()
+          .setCustomId("pet_egg")
+          .setLabel("🥚 Nhận Pet")
+          .setStyle(ButtonStyle.Success)
+      );
 
-  return interaction.update({
-    content: "🐲 **MENU THÚ CƯNG**",
-    components: [row]
-  });
-}
+      return interaction.update({
+        content: "🐲 **MENU THÚ CƯNG**",
+        components: [row]
+      });
+    }
 
   },
 
@@ -100,7 +100,7 @@ if (interaction.customId.startsWith("pet_choose_"))
       return buy.handleModal(interaction);
 
     if (interaction.customId.startsWith("pet_create_"))
-  return egg.handleModal(interaction);
+      return egg.handleModal(interaction);
 
   }
 
