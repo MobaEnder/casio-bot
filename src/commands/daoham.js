@@ -114,7 +114,7 @@ module.exports = {
 
     if (bet < MIN_BET)
       return interaction.reply({
-        content: "❌ Tiền cược tối thiểu là 50.000 VND!",
+        content: "❌ Tiền cược tối thiểu là 200.000 VND!",
         flags: 64,
       });
 
