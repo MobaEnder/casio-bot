@@ -105,7 +105,7 @@ module.exports = {
     .addIntegerOption(option =>
       option
         .setName("tien")
-        .setDescription("Số tiền cược (tối thiểu 50.000)")
+        .setDescription("Số tiền cược (tối thiểu 200.000)")
         .setRequired(true)
     ),
 
