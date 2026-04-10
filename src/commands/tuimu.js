@@ -11,9 +11,9 @@ const {
 
 const User = require("../models/User");
 
-const PRICE_PER_BAG = 10000;
+const PRICE_PER_BAG = 100000;
 const MAX_BAGS = 100;
-const WIN_PERCENT = 40; // 40% trúng = 60% xịt
+const WIN_PERCENT = 30; // 40% trúng = 60% xịt
 
 const games = new Map();
 
