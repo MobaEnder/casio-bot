@@ -42,7 +42,7 @@ module.exports = {
 
     const input = new TextInputBuilder()
       .setCustomId("bag_amount")
-      .setLabel("Nhập số túi (10k/túi)")
+      .setLabel("Nhập số túi (100k/túi)")
       .setStyle(TextInputStyle.Short)
       .setRequired(true)
       .setPlaceholder("Tối đa 100");
