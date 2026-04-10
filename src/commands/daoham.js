@@ -16,14 +16,16 @@ const MIN_BET = 200000;
 /* 🎯 TỈ LỆ XẬP THEO TẦNG */
 /* ======================= */
 function getCrashChance(floor) {
-  let base;
-  if (floor <= 10) base = 1 + ((floor - 1) * (6 / 9));
-  else if (floor <= 20) base = 7 + ((floor - 11) * (9 / 9));
-  else base = 16 + ((floor - 21) * (4 / 15));
 
-  return base * 1.3; // tăng 30%
+  if (floor <= 10)
+    return (1 + ((floor - 1) * (8 / 9))) * 1.8;
+
+  if (floor <= 20)
+    return (7 + ((floor - 11) * (11 / 9))) * 2.1;
+
+  return (16 + ((floor - 21) * (7 / 15))) * 2.6;
+
 }
-
 /* ======================= */
 /* 🎲 TỈ LỆ TẦNG RỖNG */
 /* ======================= */
