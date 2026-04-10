@@ -8,8 +8,7 @@ const cooldowns = new Map();
 // thời gian cooldown từng lệnh (giây)
 const cooldownConfig = {
   ping: 5,
-  work: 60,
-  tuimu: 120,
+  tuimu: 3600,
   daoham: 120,
 };
 
