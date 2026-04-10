@@ -10,6 +10,7 @@ const fs = require("fs");
 const path = require("path");
 require("dotenv").config();
 const connectDB = require("./database/mongo");
+const { checkCooldown } = require("./utils/cooldowns");
 connectDB();
 
 // ===== CONFIG =====
@@ -117,7 +118,6 @@ client.on(Events.InteractionCreate, async interaction => {
       const daoham = require("./commands/daoham");
       const tuimu = require("./commands/tuimu");
       const baicao = require("./commands/baicao");
-      const { checkCooldown } = require("./utils/cooldowns");
 
       if (interaction.customId.startsWith("pet_") && pet.handleButton)
         return await pet.handleButton(interaction);
