@@ -64,11 +64,11 @@ function getOreByFloor(floor) {
 
   if (floor <= 10) {
     ores = [
-      { name: "🪨 Đá Thường", min: 5000, max: 20000 },
-      { name: "🟤 Đồng", min: 8000, max: 20000 },
-      { name: "⚙️ Sắt", min: 10000, max: 20000 },
-      { name: "🔩 Bạc Thô", min: 12000, max: 20000 },
-      { name: "💠 Thạch Anh", min: 15000, max: 20000 },
+      { name: "🪨 Đá Thường", min: 5000, max: 7000 },
+      { name: "🟤 Đồng", min: 8000, max: 9000 },
+      { name: "⚙️ Sắt", min: 10000, max: 13000 },
+      { name: "🔩 Bạc Thô", min: 12000, max: 22000 },
+      { name: "💠 Thạch Anh", min: 15000, max: 23000 },
     ];
   } else if (floor <= 20) {
     ores = [
