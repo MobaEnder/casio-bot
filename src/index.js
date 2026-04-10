@@ -85,10 +85,25 @@ client.on(Events.InteractionCreate, async interaction => {
 
     // ================= SLASH =================
     if (interaction.isChatInputCommand()) {
-      const command = client.commands.get(interaction.commandName);
-      if (!command) return;
-      return await command.execute(interaction);
-    }
+
+  const command = client.commands.get(interaction.commandName);
+  if (!command) return;
+
+  // kiểm tra cooldown
+  const cooldown = checkCooldown(
+    interaction.user.id,
+    interaction.commandName
+  );
+
+  if (cooldown) {
+    return interaction.reply({
+      content: `⏳ Bạn cần chờ ${cooldown} để dùng lại lệnh **/${interaction.commandName}**`,
+      flags: 64
+    });
+  }
+
+  return await command.execute(interaction);
+}
 
     // ================= BUTTON =================
     if (interaction.isButton()) {
@@ -102,6 +117,7 @@ client.on(Events.InteractionCreate, async interaction => {
       const daoham = require("./commands/daoham");
       const tuimu = require("./commands/tuimu");
       const baicao = require("./commands/baicao");
+      const { checkCooldown } = require("./utils/cooldowns");
 
       if (interaction.customId.startsWith("pet_") && pet.handleButton)
         return await pet.handleButton(interaction);
