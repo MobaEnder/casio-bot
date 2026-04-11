@@ -18,12 +18,12 @@ const MIN_BET = 200000;
 function getCrashChance(floor) {
 
   if (floor <= 10)
-    return (1 + ((floor - 1) * (8 / 9))) * 1.8;
+    return (1 + ((floor - 1) * (7 / 9))) * 1.5;
 
   if (floor <= 20)
-    return (7 + ((floor - 11) * (11 / 9))) * 2.1;
+    return (7 + ((floor - 11) * (8 / 9))) * 1.8;
 
-  return (16 + ((floor - 21) * (7 / 15))) * 2.6;
+  return (16 + ((floor - 21) * (9 / 15))) * 2;
 
 }
 /* ======================= */
