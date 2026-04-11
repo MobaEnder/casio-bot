@@ -211,7 +211,8 @@ module.exports = {
     }
 
     const now = Date.now();
-    const cooldown = 60 * 60 * 1000;
+    // Thay đổi số 60 đầu tiên thành số 3 (3 phút * 60 giây * 1000 mili-giây)
+    const cooldown = 3 * 60 * 1000; 
 
     // 🛡️ Fix dữ liệu date lỗi cũ
     if (user.lastWork && !(user.lastWork instanceof Date)) {
@@ -227,7 +228,7 @@ module.exports = {
         flags: 64,
       });
     }
-
+    
     const job = jobs[Math.floor(Math.random() * jobs.length)];
     const reward =
       Math.floor(Math.random() * (job.max - job.min + 1)) + job.min;
