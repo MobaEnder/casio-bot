@@ -21,9 +21,9 @@ function getCrashChance(floor) {
     return (1 + ((floor - 1) * (7 / 9))) * 1.5;
 
   if (floor <= 20)
-    return (7 + ((floor - 11) * (8 / 9))) * 1.8;
+    return (7 + ((floor - 11) * (9 / 9))) * 1.9;
 
-  return (16 + ((floor - 21) * (9 / 15))) * 2;
+  return (16 + ((floor - 21) * (10 / 15))) * 2.3;
 
 }
 /* ======================= */
@@ -72,10 +72,10 @@ function getOreByFloor(floor) {
     ];
   } else if (floor <= 20) {
     ores = [
-      { name: "🥈 Bạc", min: 30000, max: 50000 },
-      { name: "🟡 Vàng", min: 35000, max: 50000 },
-      { name: "🔷 Sapphire", min: 40000, max: 50000 },
-      { name: "💎 Kim Cương Thô", min: 45000, max: 50000 },
+      { name: "🥈 Bạc", min: 23000, max: 30000 },
+      { name: "🟡 Vàng", min: 35000, max: 40000 },
+      { name: "🔷 Sapphire", min: 40000, max: 55000 },
+      { name: "💎 Kim Cương Thô", min: 45000, max: 60000 },
       { name: "🔮 Đá Ma Thuật", min: 30000, max: 50000 },
     ];
   } else {
