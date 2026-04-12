@@ -104,7 +104,4 @@ userSchema.methods.processGamble = async function(isWin, betAmount, multiplier =
     }
 };
 
-// Index tìm kiếm nhanh
-userSchema.index({ userId: 1 });
-
 module.exports = mongoose.model("User", userSchema);

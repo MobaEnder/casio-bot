@@ -80,14 +80,15 @@ module.exports = {
             .setFooter({ text: "Nhấn nút dưới đây để ký tên xác nhận" })
             .setTimestamp();
 
+        // ĐÃ SỬA: Đổi dấu ":" thành dấu "_"
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-                .setCustomId(`vaytien:accept:${borrower.id}:${lender.id}:${amount}:${dueAt.getTime()}`)
+                .setCustomId(`vaytien_accept_${borrower.id}_${lender.id}_${amount}_${dueAt.getTime()}`)
                 .setLabel("Ký Hợp Đồng")
                 .setStyle(ButtonStyle.Success)
                 .setEmoji("✍️"),
             new ButtonBuilder()
-                .setCustomId(`vaytien:decline:${borrower.id}:${lender.id}`)
+                .setCustomId(`vaytien_decline_${borrower.id}_${lender.id}`)
                 .setLabel("Từ Chối")
                 .setStyle(ButtonStyle.Danger)
         );
@@ -99,9 +100,10 @@ module.exports = {
         });
     },
 
-    // Xử lý nút bấm (Giữ nguyên cấu trúc của bạn nhưng sửa lại UI)
+    // ================= XỬ LÝ NÚT BẤM =================
     async handleButton(interaction) {
-        const [cmd, action, borrowerId, lenderId, amount, dueAt] = interaction.customId.split(":");
+        // ĐÃ SỬA: Split bằng dấu "_"
+        const [cmd, action, borrowerId, lenderId, amount, dueAt] = interaction.customId.split("_");
         if (cmd !== "vaytien") return;
 
         if (interaction.user.id !== lenderId) {
