@@ -9,7 +9,7 @@ const User = require("../models/User");
 
 const games = new Map();
 const MAX_FLOOR = 36;
-const MIN_BET = 200000;
+const MIN_BET = 200000; // Đã cố định vé là 200k
 
 /* ======================= */
 /* 🎯 TỈ LỆ XẬP THEO TẦNG */
@@ -99,19 +99,10 @@ function getOreByFloor(floor, bet) {
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("daoham")
-        .setDescription("⛏️ Đào hầm kiếm quặng - Rủi ro cao, lợi nhuận khủng")
-        .addIntegerOption(option =>
-            option
-                .setName("tien")
-                .setDescription("Số tiền cược (tối thiểu 200.000)")
-                .setRequired(true)
-        ),
+        .setDescription("⛏️ Đào hầm kiếm quặng - Phí vào hầm cố định 200.000 VND"), // Đã bỏ phần nhập option
 
     async execute(interaction) {
-        const bet = interaction.options.getInteger("tien");
-
-        if (bet < MIN_BET)
-            return interaction.reply({ content: `❌ Tiền vé xuống hầm tối thiểu là **${MIN_BET.toLocaleString()} VND**!`, flags: 64 });
+        const bet = MIN_BET; // Mặc định luôn là 200,000 VND
 
         let user = await User.findOne({ userId: interaction.user.id });
         if (!user) user = await User.create({ userId: interaction.user.id });
@@ -120,7 +111,7 @@ module.exports = {
             return interaction.reply({ content: "🚫 Bạn đang bị cấm tham gia các hoạt động do nợ xấu!", flags: 64 });
 
         if (user.money < bet)
-            return interaction.reply({ content: "❌ Bạn không đủ tiền mua vé xuống hầm!", flags: 64 });
+            return interaction.reply({ content: `❌ Bạn không đủ **${bet.toLocaleString()} VND** tiền mua vé xuống hầm!`, flags: 64 });
 
         // Trừ tiền vé
         user.money -= bet;
