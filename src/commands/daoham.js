@@ -15,9 +15,9 @@ const MIN_BET = 200000;
 /* 🎯 TỈ LỆ XẬP THEO TẦNG */
 /* ======================= */
 function getCrashChance(floor) {
-    if (floor <= 10) return (1 + ((floor - 1) * (7 / 9))) * 1.4;
-    if (floor <= 20) return (7 + ((floor - 11) * (9 / 9))) * 1.7;
-    return (16 + ((floor - 21) * (10 / 15))) * 2;
+    if (floor <= 10) return (1 + ((floor - 1) * (6 / 9))) * 1.3;
+    if (floor <= 20) return (7 + ((floor - 11) * (7 / 9))) * 1.5;
+    return (16 + ((floor - 21) * (10 / 15))) * 1.9;
 }
 
 /* ======================= */
@@ -58,19 +58,19 @@ function getOreByFloor(floor, bet) {
     let ores;
     if (floor <= 10) {
         ores = [
-            { name: "🪨 Đá Thường", min: 5000, max: 7000 },
-            { name: "🟤 Đồng", min: 8000, max: 9000 },
-            { name: "⚙️ Sắt", min: 10000, max: 13000 },
-            { name: "🔩 Bạc Thô", min: 12000, max: 22000 },
+            { name: "🪨 Đá Thường", min: 3000, max: 5000 },
+            { name: "🟤 Đồng", min: 5000, max: 8000 },
+            { name: "⚙️ Sắt", min: 9000, max: 10000 },
+            { name: "🔩 Bạc Thô", min: 11000, max: 15000 },
             { name: "💠 Thạch Anh", min: 15000, max: 23000 },
         ];
     } else if (floor <= 20) {
         ores = [
             { name: "🥈 Bạc", min: 23000, max: 30000 },
-            { name: "🟡 Vàng", min: 35000, max: 40000 },
-            { name: "🔷 Sapphire", min: 40000, max: 55000 },
-            { name: "💎 Kim Cương Thô", min: 45000, max: 60000 },
-            { name: "🔮 Đá Ma Thuật", min: 30000, max: 50000 },
+            { name: "🟡 Vàng", min: 30000, max: 35000 },
+            { name: "🔷 Sapphire", min: 35000, max: 40000 },
+            { name: "💎 Kim Cương Thô", min: 45000, max: 55000 },
+            { name: "🔮 Đá Ma Thuật", min: 55000, max: 60000 },
         ];
     } else {
         ores = [
