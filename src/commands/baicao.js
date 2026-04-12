@@ -51,7 +51,7 @@ module.exports = {
                 .setEmoji("🤖")
                 .setStyle(ButtonStyle.Primary),
             new ButtonBuilder()
-                .setCustomId(`baicao_squad_init_${bet}`)
+                .setCustomId(`baicao_squad_init_${bet}`) // Truyền bet vào đây
                 .setLabel("Lập Squad")
                 .setEmoji("👥")
                 .setStyle(ButtonStyle.Success)
@@ -61,14 +61,18 @@ module.exports = {
     },
 
     async handleButton(interaction) {
-        const [prefix, action, betStr] = interaction.customId.split("_");
+        const parts = interaction.customId.split("_");
+        const prefix = parts[0];
+        const action = parts[1];
+        const betStr = parts[2];
+        
         if (prefix !== "baicao") return;
         const bet = parseInt(betStr);
 
         // --- 🤖 CHẾ ĐỘ SOLO ---
         if (action === "solo") {
             const user = await User.findOne({ userId: interaction.user.id });
-            if (user.money < bet) return interaction.reply({ content: "❌ Bạn không đủ tiền!", flags: 64 });
+            if (!user || user.money < bet) return interaction.reply({ content: "❌ Bạn không đủ tiền!", flags: 64 });
 
             const deck = createDeck();
             shuffle(deck);
@@ -108,15 +112,15 @@ module.exports = {
         }
 
         // --- 📂 MỞ MODAL SQUAD ---
-        if (action === "squad" && betStr === "init") {
-            const realBet = interaction.customId.split("_")[3]; 
+        if (action === "squad" && parts[2] === "init") {
+            const currentBet = parts[3]; // Lấy giá trị tiền cược từ vị trí cuối
             const modal = new ModalBuilder()
-                .setCustomId(`baicao_modal_${interaction.customId.split("_")[2]}`) // Lấy bet từ ID
+                .setCustomId(`baicao_modal_${currentBet}`) // Gắn tiền vào ID Modal
                 .setTitle("Cấu hình phòng Squad");
 
             const input = new TextInputBuilder()
                 .setCustomId("player_count")
-                .setLabel("Số người chơi tối thiểu (2-17)")
+                .setLabel("Số người chơi (2-17)")
                 .setStyle(TextInputStyle.Short)
                 .setPlaceholder("Ví dụ: 3")
                 .setRequired(true);
@@ -132,7 +136,7 @@ module.exports = {
             if (room.players.has(interaction.user.id)) return interaction.reply({ content: "❌ Bạn đã ở trong phòng!", flags: 64 });
 
             const user = await User.findOne({ userId: interaction.user.id });
-            if (!user || user.money < room.bet) return interaction.reply({ content: "❌ Bạn không đủ tiền!", flags: 64 });
+            if (!user || user.money < room.bet) return interaction.reply({ content: "❌ Bạn không đủ tiền tham gia!", flags: 64 });
 
             room.players.add(interaction.user.id);
 
@@ -155,8 +159,14 @@ module.exports = {
 
     async handleModal(interaction) {
         if (!interaction.customId.startsWith("baicao_modal")) return;
+        
+        // customId là "baicao_modal_10000" -> split sẽ lấy index 2
         const bet = parseInt(interaction.customId.split("_")[2]);
         const maxPlayers = parseInt(interaction.fields.getTextInputValue("player_count"));
+
+        if (isNaN(bet)) {
+            return interaction.reply({ content: "❌ Lỗi: Không xác định được số tiền cược!", flags: 64 });
+        }
 
         if (isNaN(maxPlayers) || maxPlayers < 2 || maxPlayers > 17) {
             return interaction.reply({ content: "❌ Số người phải từ 2 đến 17!", flags: 64 });
@@ -173,7 +183,10 @@ module.exports = {
             );
 
         const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId(`baicao_join`).setLabel("Tham Gia Squad").setStyle(ButtonStyle.Success)
+            new ButtonBuilder()
+                .setCustomId(`baicao_join`)
+                .setLabel("Tham Gia Squad")
+                .setStyle(ButtonStyle.Success)
         );
 
         const msg = await interaction.reply({ embeds: [embed], components: [row], fetchReply: true });
@@ -181,7 +194,7 @@ module.exports = {
         rooms.set(msg.id, {
             host: interaction.user.id,
             maxPlayers,
-            bet,
+            bet, // Lưu bet vào map, đảm bảo không bị NaN
             players: new Set([interaction.user.id]),
             started: false,
         });
@@ -189,7 +202,7 @@ module.exports = {
 };
 
 // ==========================================
-// 🛠️ CÁC HÀM XỬ LÝ BÀI (QUAN TRỌNG)
+// 🛠️ CÁC HÀM XỬ LÝ BÀI
 // ==========================================
 
 function createDeck() {
@@ -223,10 +236,11 @@ function calculateScore(cards) {
 }
 
 async function startGame(message, room) {
+    if (!room || isNaN(room.bet)) return;
+
     const channel = message.channel;
     await channel.send("⏳ Đủ người! Đang chia bài...");
 
-    // Chờ 2 giây cho kịch tính
     setTimeout(async () => {
         const deck = createDeck();
         shuffle(deck);
