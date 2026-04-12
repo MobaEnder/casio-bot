@@ -18,12 +18,6 @@ const TOKEN = process.env.BOT_TOKEN;
 const APP_ID = process.env.APP_ID;
 const DEV_GUILD_ID = process.env.DEV_GUILD_ID;
 
-if (!TOKEN || !APP_ID) {
-  console.error("❌ Thiếu BOT_TOKEN hoặc APP_ID trong .env");
-  process.exit(1);
-}
-
-// ===== CLIENT =====
 const client = new Client({
   intents: [GatewayIntentBits.Guilds],
 });
@@ -35,173 +29,88 @@ const commands = [];
 function loadFolder(folderPath) {
   const fullPath = path.join(__dirname, folderPath);
   if (!fs.existsSync(fullPath)) return;
-
   const files = fs.readdirSync(fullPath).filter(f => f.endsWith(".js"));
 
   for (const file of files) {
     const filePath = path.join(fullPath, file);
-    delete require.cache[require.resolve(filePath)];
     const command = require(filePath);
-
-    if (!command?.data || !command?.execute) {
-      console.warn(`⚠️ ${file} thiếu data hoặc execute`);
-      continue;
+    if (command?.data && command?.execute) {
+      client.commands.set(command.data.name, command);
+      commands.push(command.data.toJSON());
     }
-
-    client.commands.set(command.data.name, command);
-    commands.push(command.data.toJSON());
   }
 }
 
 loadFolder("commands");
 loadFolder("cogs");
 
-// ===== REGISTER SLASH COMMANDS =====
+// Register Slash Commands (Giữ nguyên logic của bạn)
 const rest = new REST({ version: "10" }).setToken(TOKEN);
-
 (async () => {
   try {
-    console.log("🔄 Đang đăng ký slash commands...");
-
     if (DEV_GUILD_ID) {
-      await rest.put(
-        Routes.applicationGuildCommands(APP_ID, DEV_GUILD_ID),
-        { body: commands }
-      );
-      console.log("✅ Đã đăng ký GUILD commands (dev mode)");
+      await rest.put(Routes.applicationGuildCommands(APP_ID, DEV_GUILD_ID), { body: commands });
     } else {
-      await rest.put(Routes.applicationCommands(APP_ID), {
-        body: commands,
-      });
-      console.log("✅ Đã đăng ký GLOBAL commands");
+      await rest.put(Routes.applicationCommands(APP_ID), { body: commands });
     }
-  } catch (error) {
-    console.error("❌ Lỗi đăng ký slash commands:", error);
-  }
+    console.log("✅ Đã đăng ký Slash Commands");
+  } catch (e) { console.error(e); }
 })();
 
-// ===== INTERACTION HANDLER =====
+// ===== INTERACTION HANDLER (ĐÃ TỐI ƯU) =====
 client.on(Events.InteractionCreate, async interaction => {
   try {
-
-    // ================= SLASH =================
+    // 1. XỬ LÝ SLASH COMMANDS
     if (interaction.isChatInputCommand()) {
+      const command = client.commands.get(interaction.commandName);
+      if (!command) return;
 
-  const command = client.commands.get(interaction.commandName);
-  if (!command) return;
-
-  // kiểm tra cooldown
-  const cooldown = checkCooldown(
-    interaction.user.id,
-    interaction.commandName
-  );
-
-  if (cooldown) {
-    return interaction.reply({
-      content: `⏳ Bạn cần chờ ${cooldown} để dùng lại lệnh **/${interaction.commandName}**`,
-      flags: 64
-    });
-  }
-
-  return await command.execute(interaction);
-}
-
-    // ================= BUTTON =================
-    if (interaction.isButton()) {
-
-      const taixiu = require("./commands/taixiu");
-      const baucua = require("./commands/baucua");
-      const vaytien = require("./commands/vaytien");
-      const duangua = require("./commands/duangua");
-      const daga = require("./commands/daga");
-      const reset = require("./commands/reset");
-      const daoham = require("./commands/daoham");
-      const tuimu = require("./commands/tuimu");
-      const baicao = require("./commands/baicao");
-
-      if (interaction.customId.startsWith("pet_") && pet.handleButton)
-        return await pet.handleButton(interaction);
-
-      if (interaction.customId.startsWith("taixiu_") && taixiu.handleButton)
-        return await taixiu.handleButton(interaction);
-
-      if (interaction.customId.startsWith("baucua_") && baucua.handleButton)
-        return await baucua.handleButton(interaction);
-
-      if (interaction.customId.startsWith("vaytien:") && vaytien.handleButton)
-        return await vaytien.handleButton(interaction);
-
-      if (interaction.customId.startsWith("duangua_") && duangua.handleButton)
-        return await duangua.handleButton(interaction);
-
-      if (interaction.customId.startsWith("daga_") && daga.handleButton)
-        return await daga.handleButton(interaction);
-
-      if (interaction.customId.startsWith("reset_") && reset.handleButton)
-        return await reset.handleButton(interaction);
-
-      if (interaction.customId.startsWith("daoham_") && daoham.handleButton)
-        return await daoham.handleButton(interaction);
-
-      if (interaction.customId.startsWith("tuimu_") && tuimu.handleButton)
-        return await tuimu.handleButton(interaction);
-
-      if (interaction.customId.startsWith("baicao_") && baicao.handleButton)
-        return await baicao.handleButton(interaction);
+      const cooldown = checkCooldown(interaction.user.id, interaction.commandName);
+      if (cooldown) {
+        return interaction.reply({ content: `⏳ Chờ **${cooldown}** nữa để dùng lại **/${interaction.commandName}**`, flags: 64 });
+      }
+      return await command.execute(interaction);
     }
 
-    // ================= MODAL =================
+    // 2. XỬ LÝ BUTTONS (Tự động tìm command theo ID)
+    if (interaction.isButton()) {
+        // Tách ID: "baucua_nai" -> lấy "baucua"
+        const commandName = interaction.customId.split(/[_-]/)[0]; 
+        const command = client.commands.get(commandName);
+        
+        if (command && command.handleButton) {
+            return await command.handleButton(interaction);
+        }
+    }
+
+    // 3. XỬ LÝ MODALS (Tự động tìm command theo ID)
     if (interaction.isModalSubmit()) {
+        const commandName = interaction.customId.split(/[_-]/)[0];
+        const command = client.commands.get(commandName);
 
-      const taixiu = require("./commands/taixiu");
-      const baucua = require("./commands/baucua");
-      const duangua = require("./commands/duangua");
-      const daga = require("./commands/daga");
-      const daoham = require("./commands/daoham");
-      const tuimu = require("./commands/tuimu");
-      const baicao = require("./commands/baicao");
+        if (command && command.handleModal) {
+            return await command.handleModal(interaction);
+        }
+    }
 
-      if (interaction.customId.startsWith("pet_") && pet.handleModal)
-        return await pet.handleModal(interaction);
+    // 4. XỬ LÝ STRING SELECT MENU (Dành cho SHOP mới)
+    if (interaction.isStringSelectMenu()) {
+        const commandName = interaction.customId.split(/[_-]/)[0];
+        const command = client.commands.get(commandName);
 
-      if (interaction.customId.startsWith("taixiu_modal_") && taixiu.handleModal)
-        return await taixiu.handleModal(interaction);
-
-      if (interaction.customId.startsWith("baucua_modal_") && baucua.handleModal)
-        return await baucua.handleModal(interaction);
-
-      if (interaction.customId.startsWith("duangua_modal_") && duangua.handleModal)
-        return await duangua.handleModal(interaction);
-
-      if (interaction.customId.startsWith("daga_modal_") && daga.handleModal)
-        return await daga.handleModal(interaction);
-
-      if (interaction.customId.startsWith("daoham_") && daoham.handleModal)
-        return await daoham.handleModal(interaction);
-
-      if (interaction.customId.startsWith("tuimu_") && tuimu.handleModal)
-        return await tuimu.handleModal(interaction);
-
-      if (interaction.customId.startsWith("baicao_") && baicao.handleModal)
-        return await baicao.handleModal(interaction);
+        // Nếu shop sử dụng handleMenu hoặc logic bên trong execute của shop
+        if (command && command.handleMenu) {
+            return await command.handleMenu(interaction);
+        }
     }
 
   } catch (error) {
-    console.error("❌ Interaction error:", error);
-    try {
-      if (interaction.deferred || interaction.replied) {
-        await interaction.editReply("❌ Có lỗi xảy ra!");
-      } else {
-        await interaction.reply({ content: "❌ Có lỗi xảy ra!", flags: 64 });
-      }
-    } catch {}
+    console.error("❌ Error:", error);
+    const msg = { content: "❌ Có lỗi xảy ra khi thực hiện lệnh!", flags: 64 };
+    if (interaction.deferred || interaction.replied) await interaction.editReply(msg);
+    else await interaction.reply(msg);
   }
 });
 
-// ===== READY =====
-client.once(Events.ClientReady, client => {
-  console.log(`🤖 Bot online: ${client.user.tag}`);
-});
-
-// ===== LOGIN =====
+client.once(Events.ClientReady, c => console.log(`🤖 Bot online: ${c.user.tag}`));
 client.login(TOKEN);
