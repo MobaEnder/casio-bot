@@ -17,6 +17,18 @@ module.exports = {
             return interaction.reply({ content: "❌ Người này chưa từng tham gia casino!", flags: 64 });
         }
 
+        // --- LOGIC TÍNH LÃI SUẤT NGÂN HÀNG ---
+        let interest = 0;
+        if (user.bankMoney > 0 && user.lastDepositAt) {
+            const ms = Date.now() - new Date(user.lastDepositAt).getTime();
+            const hours = ms / (1000 * 60 * 60);
+            if (hours >= 1) {
+                // Tính lãi tạm tính: Gốc * (1 + 4%)^giờ - Gốc
+                interest = Math.floor(user.bankMoney * (Math.pow(1.04, Math.floor(hours)) - 1));
+            }
+        }
+        const totalInBank = user.bankMoney + interest;
+
         // 🎨 Thiết lập màu sắc (Đổi màu đỏ nếu bị BAN)
         let profileColor = 0x00ff99; 
         if (user.banned) profileColor = 0xFF0000;
@@ -35,7 +47,7 @@ module.exports = {
         const totalGamble = stats.win + stats.lose;
         const winRate = totalGamble > 0 ? ((stats.win / totalGamble) * 100).toFixed(1) : 0;
 
-        // 🏦 Xử lý Nợ (Cập nhật mới)
+        // 🏦 Xử lý Nợ
         let loanInfo = "✅ Sạch nợ";
         if (user.loan && user.loan.active) {
             loanInfo = `⚠️ **Nợ:** \`${user.loan.amount.toLocaleString()} VND\`\n` +
@@ -51,7 +63,9 @@ module.exports = {
             .addFields(
                 { 
                     name: "💰 Tài Chính", 
-                    value: `💵 **Tiền mặt:** \`${user.money.toLocaleString()} VND\`\n🏦 **Ngân hàng:** \`${(user.bank || 0).toLocaleString()} VND\``,
+                    value: `💵 **Tiền mặt:** \`${user.money.toLocaleString()} VND\`\n` +
+                           `🏦 **Ngân hàng:** \`${totalInBank.toLocaleString()} VND\`\n` +
+                           (interest > 0 ? `*(Trong đó có ${interest.toLocaleString()} lãi)*` : `*(Chưa có lãi mới)*`),
                     inline: false 
                 },
                 { 
@@ -72,9 +86,6 @@ module.exports = {
             )
             .setFooter({ text: `Yêu cầu bởi ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL() })
             .setTimestamp();
-
-        // Nếu bạn muốn bỏ cái ảnh to đùng ở dưới cho gọn thì xóa dòng setImage này
-        // profileEmbed.setImage("https://your-image-link.jpg");
 
         await interaction.reply({ embeds: [profileEmbed] });
     }
