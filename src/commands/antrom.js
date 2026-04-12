@@ -22,39 +22,47 @@ module.exports = {
         const thief = await User.findOne({ userId: interaction.user.id });
         const victim = await User.findOne({ userId: targetUser.id });
 
-        // 2. Kiểm tra đối tượng
+        // 2. Kiểm tra đối tượng (Nạn nhân phải có tiền mới trộm được)
         if (!victim || victim.money < 5000) {
             return interaction.reply({ content: "🤌 Đối tượng này quá nghèo, ví không có nổi 5k. Bỏ qua đi!", flags: 64 });
         }
 
-        // 3. Kiểm tra Cooldown (2 tiếng)
+        // 3. Hệ thống Cooldown (2 tiếng = 7,200,000ms)
         const cooldown = 2 * 60 * 60 * 1000;
-        if (thief.lastThief && Date.now() - thief.lastThief < cooldown) {
-            const remain = Math.ceil((cooldown - (Date.now() - thief.lastThief)) / 60000);
+        const lastThief = thief.lastThief || 0; // Nếu chưa trộm bao giờ thì mặc định là 0
+        const timePassed = Date.now() - lastThief;
+
+        if (timePassed < cooldown) {
+            const timeLeft = cooldown - timePassed;
+            const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+            const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+            
             return interaction.reply({ 
-                content: `🚨 **Cảnh sát đang đi tuần!** Bạn đang bị theo dõi, hãy nằm vùng thêm **${remain} phút** nữa.`, 
+                content: `🚨 **Cảnh sát đang tuần tra gắt gao!** Bạn đang bị đưa vào danh sách đen, hãy nằm vùng thêm **${hours} giờ ${minutes} phút** nữa.`, 
                 flags: 64 
             });
         }
 
-        // 4. Tính toán tỉ lệ thành công
-        let winChance = 0.35; // Gốc 35% cho dễ thở chút
+        // 4. Tính toán tỉ lệ thành công dựa trên Bảo Vệ của nạn nhân
+        let winChance = 0.35; // Tỉ lệ gốc 35%
         const security = victim.securityLevel || 0;
 
-        if (security === 3) winChance -= 0.30; // Bảo vệ Cao
-        else if (security === 2) winChance -= 0.20; // Bảo vệ Trung
-        else if (security === 1) winChance -= 0.10; // Bảo vệ Thấp
+        if (security === 3) winChance -= 0.30; // Bảo vệ Cao (Còn 5%)
+        else if (security === 2) winChance -= 0.20; // Bảo vệ Trung (Còn 15%)
+        else if (security === 1) winChance -= 0.10; // Bảo vệ Thấp (Còn 25%)
 
-        if (winChance < 0.05) winChance = 0.05; // Tối thiểu 5%
+        if (winChance < 0.05) winChance = 0.05; // Tối thiểu luôn có 5% cơ hội
 
         const isSuccess = Math.random() < winChance;
+        
+        // Cập nhật thời gian trộm ngay lập tức
         thief.lastThief = Date.now();
 
         const embed = new EmbedBuilder().setTimestamp();
 
         if (isSuccess) {
-            // THÀNH CÔNG
-            const stolenAmount = Math.floor(victim.money * (Math.random() * (0.12 - 0.05) + 0.05)); // Trộm ngẫu nhiên 5-12%
+            // --- THÀNH CÔNG ---
+            const stolenAmount = Math.floor(victim.money * (Math.random() * (0.12 - 0.05) + 0.05)); 
             victim.money -= stolenAmount;
             thief.money += stolenAmount;
 
@@ -62,36 +70,38 @@ module.exports = {
             await thief.save();
 
             embed
-                .setColor(0x00FF00) // Màu xanh lá
+                .setColor(0x00FF00)
                 .setTitle("🥷 PHI VỤ THÀNH CÔNG RỰC RỠ!")
-                .setThumbnail("https://i.pinimg.com/736x/6b/0d/ac/6b0dac51c8700766a8146361bb4a84b7.jpg") // Link ảnh icon trộm (nếu có)
-                .setDescription(`Bạn đã lẻn vào nhà <@${targetUser.id}> một cách êm đềm...`)
+                .setThumbnail("https://i.pinimg.com/736x/6b/0d/ac/6b0dac51c8700766a8146361bb4a84b7.jpg")
+                .setDescription(`Bạn đã lẻn vào nhà <@${targetUser.id}> và khoét vách thành công!`)
                 .addFields(
-                    { name: "💰 Tiền vớ được", value: `\`${stolenAmount.toLocaleString()} VND\``, inline: true },
+                    { name: "💰 Tiền vớ được", value: `\`+${stolenAmount.toLocaleString()} VND\``, inline: true },
                     { name: "🏦 Ví hiện tại", value: `\`${thief.money.toLocaleString()} VND\``, inline: true }
                 )
-                .setFooter({ text: "Đừng để bị bắt ở lần sau nhé!" });
+                .setFooter({ text: "Mau chuồn lẹ trước khi chủ nhà thức dậy!" });
 
             return interaction.reply({ embeds: [embed] });
 
-        } else {
-            // THẤT BẠI
-            const fine = 50000; // Phạt cố định hoặc % tùy bạn
-            thief.money -= fine;
-            if (thief.money < 0) thief.money = 0; // Không cho tiền âm
+} else {
+    // --- THẤT BẠI (BỊ BẮT & PHẠT TIỀN NGẪU NHIÊN) ---
+    
+    // Công thức: Math.floor(Math.random() * (max - min + 1)) + min
+    const fine = Math.floor(Math.random() * (100000 - 50000 + 1)) + 50000; 
+    
+    thief.money -= fine; // Trừ tiền (có thể xuống số âm)
 
-            await thief.save();
+    await thief.save();
 
-            embed
-                .setColor(0xFF0000) // Màu đỏ
-                .setTitle("🚔 BẠN ĐÃ BỊ CẢNH SÁT BẮT!")
-                .setThumbnail("https://www.thanglongwaterpuppet.org/wp-content/uploads/2025/10/1_chu-ao-xanh-xuat-hien-trong-meme-khien-tinh-huong-nho-nhat-tro-nen-vui-nhon.jpg") // Link ảnh icon cảnh sát
-                .setDescription(`Đen quá! <@${targetUser.id}> đã lắp camera ẩn và báo cảnh sát tóm sống bạn.`)
+    embed
+        .setColor(0xFF0000)
+        .setTitle("🚔 BẠN ĐÃ BỊ CÔNG AN TÓM!")
+                .setThumbnail("https://www.thanglongwaterpuppet.org/wp-content/uploads/2025/10/1_chu-ao-xanh-xuat-hien-trong-meme-khien-tinh-huong-nho-nhat-tro-nen-vui-nhon.jpg")
+                .setDescription(`Đen thôi đỏ quên đi! <@${targetUser.id}> đã mai phục sẵn và tóm sống bạn giao cho đồn cảnh sát.`)
                 .addFields(
-                    { name: "💸 Tiền phạt", value: `\`${fine.toLocaleString()} VND\``, inline: true },
-                    { name: "📉 Số dư còn lại", value: `\`${thief.money.toLocaleString()} VND\``, inline: true }
+                    { name: "💸 Tiền phạt", value: `\`-${fine.toLocaleString()} VND\``, inline: true },
+                    { name: "📉 Tình trạng ví", value: `\`${thief.money.toLocaleString()} VND\` ${thief.money < 0 ? "(NỢ 💸)" : ""}`, inline: true }
                 )
-                .setFooter({ text: "Cơm tù có vẻ ngon đấy!" });
+                .setFooter({ text: "Lao động là vinh quang, hãy /work để trả nợ nhé!" });
 
             return interaction.reply({ embeds: [embed] });
         }
