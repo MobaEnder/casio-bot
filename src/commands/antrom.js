@@ -1,3 +1,6 @@
+const { SlashCommandBuilder, EmbedBuilder } = require("discord.js"); // Thêm SlashCommandBuilder vào đây
+const User = require("../models/User");
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("steal")
