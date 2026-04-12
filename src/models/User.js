@@ -5,7 +5,9 @@ const userSchema = new mongoose.Schema({
 
   // 💰 Tiền tệ
   money: { type: Number, default: 1000 },
-  bank: { type: Number, default: 0 }, 
+  bankMoney: { type: Number, default: 0 },         // Tiền trong ngân hàng
+  lastDepositAt: { type: Date, default: null },    // Mốc thời gian gửi tiền để tính lãi
+  // ---------------------------
 
   // ⏳ Cooldown
   lastDaily: { type: Date, default: null },
