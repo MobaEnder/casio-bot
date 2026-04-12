@@ -15,9 +15,9 @@ const MIN_BET = 200000;
 /* 🎯 TỈ LỆ XẬP THEO TẦNG */
 /* ======================= */
 function getCrashChance(floor) {
-    if (floor <= 10) return (1 + ((floor - 1) * (6 / 9))) * 1.3;
+    if (floor <= 10) return (1 + ((floor - 1) * (5 / 9))) * 1.3;
     if (floor <= 20) return (7 + ((floor - 11) * (7 / 9))) * 1.5;
-    return (16 + ((floor - 21) * (10 / 15))) * 1.9;
+    return (16 + ((floor - 21) * (9 / 15))) * 1.9;
 }
 
 /* ======================= */
@@ -66,11 +66,11 @@ function getOreByFloor(floor, bet) {
         ];
     } else if (floor <= 20) {
         ores = [
-            { name: "🥈 Bạc", min: 23000, max: 30000 },
+            { name: "🥈 Bạc", min: 12000, max: 22000 },
             { name: "🟡 Vàng", min: 30000, max: 35000 },
-            { name: "🔷 Sapphire", min: 35000, max: 40000 },
-            { name: "💎 Kim Cương Thô", min: 45000, max: 55000 },
-            { name: "🔮 Đá Ma Thuật", min: 55000, max: 60000 },
+            { name: "🔷 Sapphire", min: 30000, max: 35000 },
+            { name: "💎 Kim Cương Thô", min: 35000, max: 40000 },
+            { name: "🔮 Đá Ma Thuật", min: 40000, max: 50000 },
         ];
     } else {
         ores = [
