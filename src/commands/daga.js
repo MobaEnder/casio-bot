@@ -1,217 +1,181 @@
 const {
-  SlashCommandBuilder,
-  EmbedBuilder,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  ModalBuilder,
-  TextInputBuilder,
-  TextInputStyle,
+    SlashCommandBuilder,
+    EmbedBuilder,
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle,
+    ModalBuilder,
+    TextInputBuilder,
+    TextInputStyle,
 } = require("discord.js");
 const User = require("../models/User");
 
-const games = new Map(); // messageId -> game
-const FIGHT_TIME = 10000;
-const BET_TIME = 30000;
+const games = new Map();
+const FIGHT_TIME = 10000; // 10 giây đá
+const BET_TIME = 30000;   // 30 giây đặt cược
 
 module.exports = {
-  data: new SlashCommandBuilder()
-    .setName("daga")
-    .setDescription("🐔 Đá gà - Chọn Gà Đỏ hoặc Gà Đen để đặt cược!"),
+    data: new SlashCommandBuilder()
+        .setName("daga")
+        .setDescription("🐔 Đá gà - Chọn Gà Đỏ (Meron) hoặc Gà Đen (Wala)!"),
 
-  async execute(interaction) {
-    const embed = new EmbedBuilder()
-      .setColor(0xff3333)
-      .setTitle("🐔 SÀN ĐẤU GÀ")
-      .setDescription(
-        "🎯 Chọn phe để đặt cược:\n\n" +
-        "🔴 **GÀ ĐỎ**\n⚫ **GÀ ĐEN**\n\n" +
-        "⏳ Thời gian đặt cược: **30 giây**"
-      )
-      .setFooter({ text: "BOT Casino 💎" })
-      .setTimestamp();
+    async execute(interaction) {
+        const embed = new EmbedBuilder()
+            .setColor(0xff3333)
+            .setTitle("🐔 SÀN ĐẤU GÀ TRỰC TIẾP")
+            .setDescription(
+                "🎯 **Đặt cược vào chiến kê bạn tin tưởng:**\n\n" +
+                "🔴 **GÀ ĐỎ (Meron)** - Tỉ lệ x1.95\n" +
+                "⚫ **GÀ ĐEN (Wala)** - Tỉ lệ x1.95\n\n" +
+                "⏳ Thời gian đặt cược: **30 giây**"
+            )
+            .setFooter({ text: "BOT Casino 💎" })
+            .setTimestamp();
 
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId("daga_red")
-        .setLabel("🔴 Gà Đỏ")
-        .setStyle(ButtonStyle.Danger),
-      new ButtonBuilder()
-        .setCustomId("daga_black")
-        .setLabel("⚫ Gà Đen")
-        .setStyle(ButtonStyle.Secondary)
-    );
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId("daga_red")
+                .setLabel("Gà Đỏ")
+                .setEmoji("🔴")
+                .setStyle(ButtonStyle.Danger),
+            new ButtonBuilder()
+                .setCustomId("daga_black")
+                .setLabel("Gà Đen")
+                .setEmoji("⚫")
+                .setStyle(ButtonStyle.Secondary)
+        );
 
-    const msg = await interaction.reply({
-      embeds: [embed],
-      components: [row],
-      withResponse: true,
-    });
+        const msg = await interaction.reply({
+            embeds: [embed],
+            components: [row],
+            fetchReply: true,
+        });
 
-    const message = msg.resource.message;
+        games.set(msg.id, {
+            bets: new Map(),
+            isStarted: false,
+        });
 
-    games.set(message.id, {
-      bets: new Map(), // userId -> { side, amount }
-      channelId: interaction.channelId,
-      messageId: message.id,
-      endsAt: Date.now() + BET_TIME,
-    });
+        setTimeout(() => startFight(msg), BET_TIME);
+    },
 
-    setTimeout(() => startFight(message), BET_TIME);
-  },
+    async handleButton(interaction) {
+        const game = games.get(interaction.message.id);
+        if (!game || game.isStarted) {
+            return interaction.reply({ content: "❌ Trận đấu đã bắt đầu hoặc kết thúc!", flags: 64 });
+        }
 
-  // ================= BUTTON =================
-  async handleButton(interaction) {
-    const game = games.get(interaction.message.id);
-    if (!game) {
-      return interaction.reply({
-        content: "❌ Trận đấu này đã kết thúc!",
-        flags: 64,
-      });
-    }
+        const side = interaction.customId === "daga_red" ? "red" : "black";
+        const modal = new ModalBuilder()
+            .setCustomId(`daga_modal_${side}`)
+            .setTitle(`🐔 Đặt cược Gà ${side === "red" ? "Đỏ" : "Đen"}`);
 
-    const side = interaction.customId === "daga_red" ? "red" : "black";
+        const input = new TextInputBuilder()
+            .setCustomId("bet_amount")
+            .setLabel("Số tiền cược (VND)")
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true);
 
-    const modal = new ModalBuilder()
-      .setCustomId(`daga_modal_${side}`)
-      .setTitle(`🐔 Đặt cược Gà ${side === "red" ? "Đỏ" : "Đen"}`);
+        modal.addComponents(new ActionRowBuilder().addComponents(input));
+        await interaction.showModal(modal);
+    },
 
-    const input = new TextInputBuilder()
-      .setCustomId("bet_amount")
-      .setLabel("Số tiền cược")
-      .setStyle(TextInputStyle.Short)
-      .setRequired(true)
-      .setPlaceholder("Ví dụ: 10000");
+    async handleModal(interaction) {
+        const side = interaction.customId.split("_")[2];
+        const amount = parseInt(interaction.fields.getTextInputValue("bet_amount"));
+        const game = games.get(interaction.message.id);
 
-    modal.addComponents(new ActionRowBuilder().addComponents(input));
-    await interaction.showModal(modal);
-  },
+        if (!game || game.isStarted) {
+            return interaction.reply({ content: "❌ Hết thời gian đặt cược!", flags: 64 });
+        }
 
-  // ================= MODAL =================
-  async handleModal(interaction) {
-    const side = interaction.customId.split("_")[2];
-    const amount = parseInt(interaction.fields.getTextInputValue("bet_amount"));
+        if (isNaN(amount) || amount < 1000) {
+            return interaction.reply({ content: "❌ Tiền cược tối thiểu là 1.000 VND!", flags: 64 });
+        }
 
-    if (isNaN(amount) || amount <= 0) {
-      return interaction.reply({
-        content: "❌ Số tiền không hợp lệ!",
-        flags: 64,
-      });
-    }
+        const user = await User.findOne({ userId: interaction.user.id });
+        if (!user || user.money < amount) {
+            return interaction.reply({ content: "❌ Bạn không đủ tiền!", flags: 64 });
+        }
 
-    let user = await User.findOne({ userId: interaction.user.id });
-    if (!user) user = await User.create({ userId: interaction.user.id });
+        // 🔥 TRỪ TIỀN NGAY LẬP TỨC
+        user.money -= amount;
+        await user.save();
 
-    if (user.money < amount) {
-      return interaction.reply({
-        content: "❌ Bạn không đủ tiền!",
-        flags: 64,
-      });
-    }
+        game.bets.set(interaction.user.id, { side, amount });
 
-    const game = games.get(interaction.message.id);
-    if (!game) {
-      return interaction.reply({
-        content: "❌ Trận đấu đã kết thúc!",
-        flags: 64,
-      });
-    }
-
-    game.bets.set(interaction.user.id, {
-      side,
-      amount,
-    });
-
-    await interaction.reply({
-      content: `✅ Bạn đã đặt **${amount.toLocaleString("vi-VN")} VND** cho 🐔 **Gà ${side === "red" ? "Đỏ" : "Đen"}**`,
-      flags: 64,
-    });
-  },
+        await interaction.reply({
+            content: `✅ Đã đặt **${amount.toLocaleString()} VND** cho 🐔 **Gà ${side === "red" ? "Đỏ" : "Đen"}**.`,
+            flags: 64,
+        });
+    },
 };
 
-// ================= FIGHT ENGINE =================
 async function startFight(message) {
-  const game = games.get(message.id);
-  if (!game) return;
+    const game = games.get(message.id);
+    if (!game) return;
+    game.isStarted = true;
 
-  const frames = [
-    "🐔🔴  ⚔️  ⚫🐔",
-    "🐔🔴  💥  ⚫🐔",
-    "🐔🔴💨     ⚫🐔",
-    "🐔🔴   💥  ⚫🐔",
-    "🐔🔴  ⚔️  ⚫🐔",
-    "🐔🔴💥     ⚫🐔",
-  ];
+    const frames = [
+        "🐔🔴   ⚔️   ⚫🐔",
+        "🐔🔴  💥   ⚫🐔",
+        "   🐔🔴💨   ⚫🐔",
+        "🐔🔴   💥  ⚫🐔",
+        "🐔🔴   ⚔️   ⚫🐔",
+        "🐔🔴    💨⚫🐔",
+    ];
 
-  const embed = new EmbedBuilder()
-    .setColor(0xffaa00)
-    .setTitle("🐔 TRẬN ĐẤU ĐANG DIỄN RA!")
-    .setDescription(frames[0])
-    .setFooter({ text: "HOP-BOT Casino 💎" })
-    .setTimestamp();
+    const embed = new EmbedBuilder()
+        .setColor(0xffaa00)
+        .setTitle("🐔 TRẬN ĐẤU ĐANG CĂNG THẲNG!")
+        .setDescription(frames[0]);
 
-  await message.edit({
-    embeds: [embed],
-    components: [],
-  });
+    await message.edit({ embeds: [embed], components: [] });
 
-  let i = 0;
-  const interval = setInterval(async () => {
-    i++;
-    embed.setDescription(frames[i % frames.length]);
-    await message.edit({ embeds: [embed] });
-  }, 1500);
+    let count = 0;
+    const interval = setInterval(async () => {
+        count++;
+        const frame = frames[count % frames.length];
+        await message.edit({ embeds: [embed.setDescription(frame)] }).catch(() => {});
+    }, 2000);
 
-  setTimeout(async () => {
-    clearInterval(interval);
-    const winner = Math.random() < 0.5 ? "red" : "black";
-    await finishFight(message, winner);
-  }, FIGHT_TIME);
+    setTimeout(async () => {
+        clearInterval(interval);
+        const winner = Math.random() < 0.5 ? "red" : "black";
+        await finishFight(message, winner);
+    }, FIGHT_TIME);
 }
 
 async function finishFight(message, winnerSide) {
-  const game = games.get(message.id);
-  if (!game) return;
+    const game = games.get(message.id);
+    if (!game) return;
 
-  let winPool = 0;
-  let winners = [];
+    let resultText = "";
+    const promises = Array.from(game.bets.entries()).map(async ([userId, bet]) => {
+        const user = await User.findOne({ userId });
+        if (!user) return;
 
-  for (const [userId, bet] of game.bets.entries()) {
-    if (bet.side !== winnerSide) winPool += bet.amount;
-  }
+        if (bet.side === winnerSide) {
+            const winAmount = Math.floor(bet.amount * 1.95); // Thắng nhận lại vốn + 0.95 tiền thưởng
+            user.money += winAmount;
+            resultText += `✅ <@${userId}> +${winAmount.toLocaleString()} VND\n`;
+        } else {
+            resultText += `❌ <@${userId}> -${bet.amount.toLocaleString()} VND\n`;
+        }
+        await user.save();
+    });
 
-  for (const [userId, bet] of game.bets.entries()) {
-    const user = await User.findOne({ userId });
-    if (!user) continue;
+    await Promise.all(promises);
 
-    if (bet.side === winnerSide) {
-      const share = Math.floor(winPool / [...game.bets.values()].filter(b => b.side === winnerSide).length);
-      user.money += bet.amount + share;
-      user.stats.win++;
-      winners.push(`<@${userId}> +${(bet.amount + share).toLocaleString("vi-VN")} VND`);
-    } else {
-      user.money -= bet.amount;
-      user.stats.lose++;
-    }
+    const embed = new EmbedBuilder()
+        .setColor(winnerSide === "red" ? "Red" : "NotQuiteBlack")
+        .setTitle("🏆 KẾT QUẢ TRẬN ĐẤU")
+        .setDescription(
+            `🥇 **Gà thắng:** ${winnerSide === "red" ? "🔴 GÀ ĐỎ" : "⚫ GÀ ĐEN"}\n\n` +
+            `💰 **Chi tiết:**\n${resultText || "Không có ai tham gia đặt cược."}`
+        )
+        .setTimestamp();
 
-    user.stats.gamblePlayed++;
-    await user.save();
-  }
-
-  const embed = new EmbedBuilder()
-    .setColor(winnerSide === "red" ? 0xff0000 : 0x000000)
-    .setTitle("🏆 KẾT QUẢ ĐÁ GÀ")
-    .setDescription(
-      `🥇 **Gà thắng:** 🐔 ${winnerSide === "red" ? "Gà Đỏ 🔴" : "Gà Đen ⚫"}\n\n` +
-      `💰 **Người thắng:**\n${winners.join("\n") || "Không ai 😭"}`
-    )
-    .setFooter({ text: "BOT Casino 💎" })
-    .setTimestamp();
-
-  await message.edit({
-    embeds: [embed],
-    components: [],
-  });
-
-  games.delete(message.id);
+    await message.edit({ embeds: [embed] });
+    games.delete(message.id);
 }
