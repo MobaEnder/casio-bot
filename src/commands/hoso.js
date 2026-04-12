@@ -17,9 +17,9 @@ module.exports = {
             return interaction.reply({ content: "❌ Người này chưa từng tham gia casino!", flags: 64 });
         }
 
-        // 🎨 Thiết lập màu sắc dựa trên danh hiệu hoặc ngẫu nhiên
-        const colors = [0xFF5733, 0x33FF57, 0x3357FF, 0xF333FF, 0xFFF333];
-        const randomColor = colors[Math.floor(Math.random() * colors.length)];
+        // 🎨 Thiết lập màu sắc (Đổi màu đỏ nếu bị BAN)
+        let profileColor = 0x00ff99; 
+        if (user.banned) profileColor = 0xFF0000;
 
         // 🏆 Xử lý Danh hiệu & Bùa chú
         const title = user.titles?.active || "Dân Thường";
@@ -31,39 +31,50 @@ module.exports = {
         const currentGuard = guards[user.securityLevel || 0];
 
         // 📊 Tính tỉ lệ thắng
-        const totalGamble = user.stats.win + user.stats.lose;
-        const winRate = totalGamble > 0 ? ((user.stats.win / totalGamble) * 100).toFixed(1) : 0;
+        const stats = user.stats || { win: 0, lose: 0 };
+        const totalGamble = stats.win + stats.lose;
+        const winRate = totalGamble > 0 ? ((stats.win / totalGamble) * 100).toFixed(1) : 0;
+
+        // 🏦 Xử lý Nợ (Cập nhật mới)
+        let loanInfo = "✅ Sạch nợ";
+        if (user.loan && user.loan.active) {
+            loanInfo = `⚠️ **Nợ:** \`${user.loan.amount.toLocaleString()} VND\`\n` +
+                       `👤 **Chủ nợ:** <@${user.loan.from}>\n` +
+                       `⏰ **Hạn:** <t:${Math.floor(user.loan.dueAt.getTime() / 1000)}:R>`;
+        }
 
         const profileEmbed = new EmbedBuilder()
-            .setColor(randomColor)
+            .setColor(profileColor)
             .setTitle(`✨ HỒ SƠ CỦA ${target.username.toUpperCase()} ✨`)
             .setThumbnail(target.displayAvatarURL({ dynamic: true }))
-            .setDescription(`> *"${title}"*`) // Hiển thị danh hiệu ngay dưới tên
+            .setDescription(user.banned ? "🚫 **TÀI KHOẢN ĐANG BỊ PHONG TỎA (BANNED)**" : `> *"${title}"*`)
             .addFields(
                 { 
                     name: "💰 Tài Chính", 
-                    value: `💵 **Tiền mặt:** \`${user.money.toLocaleString()} VND\`\n🏦 **Ngân hàng:** \`${user.bank.toLocaleString()} VND\``,
+                    value: `💵 **Tiền mặt:** \`${user.money.toLocaleString()} VND\`\n🏦 **Ngân hàng:** \`${(user.bank || 0).toLocaleString()} VND\``,
                     inline: false 
                 },
                 { 
-                    name: "🧿 Trang Bị Đang Dùng", 
+                    name: "🧿 Trang Bị & Bảo Vệ", 
                     value: `✨ **Bùa Luck:** ${luckBuff}\n🔰 **Bùa Khiên:** ${shieldBuff}\n🛡️ **Bảo vệ:** ${currentGuard}`,
                     inline: false 
                 },
                 { 
                     name: "📈 Thống Kê Casino", 
-                    value: `✅ **Thắng:** ${user.stats.win}\n❌ **Thua:** ${user.stats.lose}\n📊 **Tỉ lệ thắng:** ${winRate}%`,
+                    value: `✅ **Thắng:** ${stats.win}\n❌ **Thua:** ${stats.lose}\n📊 **Tỉ lệ:** ${winRate}%`,
                     inline: true 
                 },
                 { 
-                    name: "🏮 Thông Tin Khác", 
-                    value: `💳 **Nợ:** ${user.loan?.active ? `${user.loan.amount.toLocaleString()} VND` : "Không nợ"}\n📅 **Ngày tham gia:** <t:${Math.floor(user.createdAt / 1000)}:R>`,
+                    name: "🏮 Thông Tin Nợ", 
+                    value: loanInfo,
                     inline: true 
                 }
             )
-            .setImage("https://cdn2.fptshop.com.vn/unsafe/1920x0/filters:format(webp):quality(75)/2023_10_30_638342953175094393_profile-la-gi-thmb.jpg") // Link ảnh trang trí nếu có, hoặc dùng Canvas để vẽ
             .setFooter({ text: `Yêu cầu bởi ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL() })
             .setTimestamp();
+
+        // Nếu bạn muốn bỏ cái ảnh to đùng ở dưới cho gọn thì xóa dòng setImage này
+        // profileEmbed.setImage("https://your-image-link.jpg");
 
         await interaction.reply({ embeds: [profileEmbed] });
     }
