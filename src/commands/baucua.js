@@ -30,17 +30,17 @@ module.exports = {
 
   async execute(interaction) {
     const user = await User.findOneAndUpdate(
-  { userId: interaction.user.id },
-  {},
-  { upsert: true, new: true }
-);
+      { userId: interaction.user.id },
+      {},
+      { upsert: true, new: true }
+    );
 
-if (user.banned) {
-  return interaction.reply({
-    content: "⛔ Bạn đã bị cấm vĩnh viễn khỏi hệ thống cược do không trả nợ!",
-    flags: 64,
-  });
-}
+    if (user.banned) {
+      return interaction.reply({
+        content: "⛔ Bạn đã bị cấm vĩnh viễn khỏi hệ thống cược do không trả nợ!",
+        flags: 64,
+      });
+    }
 
     const embed = new EmbedBuilder()
       .setColor(0xff8800)
@@ -102,10 +102,34 @@ if (user.banned) {
       const game = games.get(message.id);
       if (!game) return;
 
-      // lắc 3 xúc xắc bầu cua
-      const rolls = Array.from({ length: 3 }, () =>
-        FACES[Math.floor(Math.random() * FACES.length)]
-      );
+      // 🎲 LOGIC NÂNG CẤP TỈ LỆ 40% THẮNG - 60% THUA
+      let rolls = [];
+      
+      // Lấy danh sách các mặt mà người chơi đã đặt cược
+      const betFaces = Array.from(new Set(Array.from(game.bets.values()).map(b => b.face)));
+
+      // Nếu không có ai cược, hoặc người chơi cược rải đều cả 6 mặt (không thể ép thua 100%) thì random bình thường
+      if (betFaces.length === 0 || betFaces.length === FACES.length) {
+        rolls = Array.from({ length: 3 }, () => FACES[Math.floor(Math.random() * FACES.length)]);
+      } else {
+        const isWin = Math.random() < 0.40; // 40% Thắng, 60% Thua
+
+        if (isWin) {
+          // Người chơi Thắng (40%): Đảm bảo ra ít nhất 1 mặt có người cược
+          const winningFace = betFaces[Math.floor(Math.random() * betFaces.length)];
+          rolls.push(winningFace); 
+          // 2 viên còn lại random ngẫu nhiên
+          rolls.push(FACES[Math.floor(Math.random() * FACES.length)]);
+          rolls.push(FACES[Math.floor(Math.random() * FACES.length)]);
+          
+          // Trộn ngẫu nhiên thứ tự 3 xúc xắc
+          rolls.sort(() => Math.random() - 0.5);
+        } else {
+          // Người chơi Thua (60%): Xúc xắc CHỈ ra các mặt mà KHÔNG AI CƯỢC
+          const loseFaces = FACES.filter(f => !betFaces.includes(f));
+          rolls = Array.from({ length: 3 }, () => loseFaces[Math.floor(Math.random() * loseFaces.length)]);
+        }
+      }
 
       const counts = {};
       for (const r of rolls) counts[r] = (counts[r] || 0) + 1;
@@ -114,30 +138,29 @@ if (user.banned) {
       let loseList = "";
 
       for (const [userId, bet] of game.bets.entries()) {
-  let user = await User.findOne({ userId });
-  if (!user) continue;
+        let user = await User.findOne({ userId });
+        if (!user) continue;
 
-  const hit = counts[bet.face] || 0;
+        const hit = counts[bet.face] || 0;
 
-  if (hit > 0) {
-    const multiplier = hit + 1; // 🎯 1 con = x2 | 2 con = x3 | 3 con = x4
-    const winAmount = bet.amount * multiplier;
+        if (hit > 0) {
+          const multiplier = hit + 0.5; // 🎯 1 con = x2 | 2 con = x3 | 3 con = x4
+          const winAmount = bet.amount * multiplier;
 
-    user.money += winAmount;
-    user.stats.win++;
+          user.money += winAmount;
+          user.stats.win++;
 
-    winList += `✅ <@${userId}> +${winAmount.toLocaleString("vi-VN")} VND (${EMOJIS[bet.face]} x${multiplier})\n`;
-  } else {
-    user.money -= bet.amount;
-    user.stats.lose++;
+          winList += `✅ <@${userId}> +${winAmount.toLocaleString("vi-VN")} VND (${EMOJIS[bet.face]} x${multiplier})\n`;
+        } else {
+          user.money -= bet.amount;
+          user.stats.lose++;
 
-    loseList += `❌ <@${userId}> -${bet.amount.toLocaleString("vi-VN")} VND (${EMOJIS[bet.face]})\n`;
-  }
+          loseList += `❌ <@${userId}> -${bet.amount.toLocaleString("vi-VN")} VND (${EMOJIS[bet.face]})\n`;
+        }
 
-  user.stats.gamblePlayed++;
-  await user.save();
-}
-
+        user.stats.gamblePlayed++;
+        await user.save();
+      }
 
       const resultEmbed = new EmbedBuilder()
         .setColor(0x00ff99)
