@@ -11,64 +11,78 @@ const User = require("../models/User");
 // Định nghĩa dữ liệu vật phẩm chi tiết
 const ITEMS = {
     titles: [
-        { id: "t_de_vuong", name: "Đế Vương", price: 1000000000, type: "title" },
-        { id: "t_dan_choi", name: "Dân Chơi", price: 100000000, type: "title" },
-        { id: "t_than_bai", name: "Thần Bài", price: 500000000, type: "title" }
+        { id: "t_tap_su", name: "🎰 Con Nghiện Tập Sự", price: 10000000, type: "title" },
+        { id: "t_dan_choi", name: "🕶️ Dân Chơi Hệ Tiền", price: 100000000, type: "title" },
+        { id: "t_than_bai", name: "🃏 Thần Bài Tái Thế", price: 500000000, type: "title" },
+        { id: "t_de_vuong", name: "👑 Đế Vương Casino", price: 1000000000, type: "title" },
+        { id: "t_huyen_thoai", name: "🌌 Huyền Thoại Bất Tử", price: 3000000000, type: "title" }
     ],
     guards: [
-        { id: "g_low", name: "Bảo Vệ Cấp Thấp", price: 50000, type: "guard", level: 1, desc: "Giảm 10% tỉ lệ bị trộm" },
-        { id: "g_high", name: "Bảo Vệ Cấp Cao", price: 200000, type: "guard", level: 2, desc: "Giảm 25% tỉ lệ bị trộm" }
+        { id: "g_low", name: "🛡️ Bảo Vệ Cấp Thấp", price: 1000000, type: "guard", level: 1, desc: "Giảm 10% tỉ lệ bị trộm" },
+        { id: "g_mid", name: "🛡️ Bảo Vệ Cấp Trung", price: 50000000, type: "guard", level: 2, desc: "Giảm 25% tỉ lệ bị trộm" },
+        { id: "g_high", name: "🛡️ Bảo Vệ Cấp Cao", price: 100000000, type: "guard", level: 3, desc: "Giảm 50% tỉ lệ bị trộm" }
     ],
     charms: [
-        { id: "c_luck", name: "Bùa May Mắn (+10%)", price: 50000000, type: "charm", boost: 0.10, desc: "Tăng 10% tỉ lệ thắng ván sau" },
-        { id: "c_shield", name: "Bùa Hộ Thân", price: 100000000, type: "charm", shield: 0.5, desc: "Giảm 50% tiền mất khi thua" }
+        // Bùa May Mắn (Luck)
+        { id: "c_luck_s", name: "🍀 Bùa Luck Nhỏ (+5%)", price: 10000000, type: "charm", boost: 0.05, desc: "Tăng 5% tỉ lệ thắng ván sau" },
+        { id: "c_luck_m", name: "🍀 Bùa Luck Vừa (+15%)", price: 50000000, type: "charm", boost: 0.15, desc: "Tăng 15% tỉ lệ thắng ván sau" },
+        { id: "c_luck_l", name: "🍀 Bùa Luck To (+30%)", price: 200000000, type: "charm", boost: 0.30, desc: "Tăng 30% tỉ lệ thắng ván sau" },
+        // Bùa Hộ Thân (Shield)
+        { id: "c_shield_s", name: "🔰 Khiên Nhỏ (Giảm 20%)", price: 15000000, type: "charm", shield: 0.2, desc: "Giảm 20% tiền mất khi thua" },
+        { id: "c_shield_m", name: "🔰 Khiên Vừa (Giảm 50%)", price: 100000000, type: "charm", shield: 0.5, desc: "Giảm 50% tiền mất khi thua" },
+        { id: "c_shield_l", name: "🔰 Khiên To (Giảm 80%)", price: 400000000, type: "charm", shield: 0.8, desc: "Giảm 80% tiền mất khi thua" }
     ]
 };
 
 module.exports = {
-    data: new SlashCommandBuilder().setName("shop").setDescription("Mở cửa hàng đa năng"),
+    data: new SlashCommandBuilder().setName("shop").setDescription("Mở cửa hàng vật phẩm Casino"),
 
     async execute(interaction) {
-        // 1. Giao diện chính (Category Selection)
+        // 1. Giao diện chính
         const mainEmbed = new EmbedBuilder()
             .setColor(0x0099ff)
             .setTitle("🏪 HỆ THỐNG CỬA HÀNG CASINO")
-            .setDescription("Chọn một danh mục để xem các mặt hàng đang bán:")
+            .setDescription("Chào mừng bạn! Hãy chọn danh mục vật phẩm muốn xem:")
             .addFields(
-                { name: "🎭 Danh Hiệu", value: "Dùng để hiển thị độ sang chảnh.", inline: true },
-                { name: "🛡️ Bảo Vệ", value: "Chống lại quân trộm cắp.", inline: true },
-                { name: "🧿 Bùa Chú", value: "Tăng tỉ lệ thắng cược.", inline: true }
-            );
+                { name: "🎭 Danh Hiệu", value: "Thể hiện đẳng cấp của bạn.", inline: true },
+                { name: "🛡️ Bảo Vệ", value: "Chống trộm cắp tài sản.", inline: true },
+                { name: "🧿 Bùa Chú", value: "Tăng may mắn & giảm rủi ro.", inline: true }
+            )
+            .setFooter({ text: "Hệ thống sẽ tự đóng sau 60 giây không tương tác." });
 
         const categoryRow = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId("open_titles").setLabel("🎭 Shop Danh Hiệu").setStyle(ButtonStyle.Primary),
-            new ButtonBuilder().setCustomId("open_guards").setLabel("🛡️ Shop Bảo Vệ").setStyle(ButtonStyle.Success),
-            new ButtonBuilder().setCustomId("open_charms").setLabel("🧿 Shop Bùa Chú").setStyle(ButtonStyle.Secondary)
+            new ButtonBuilder().setCustomId("shop_titles").setLabel("Shop Danh Hiệu").setStyle(ButtonStyle.Primary).setEmoji("🎭"),
+            new ButtonBuilder().setCustomId("shop_guards").setLabel("Shop Bảo Vệ").setStyle(ButtonStyle.Success).setEmoji("🛡️"),
+            new ButtonBuilder().setCustomId("shop_charms").setLabel("Shop Bùa Chú").setStyle(ButtonStyle.Secondary).setEmoji("🧿")
         );
 
-        const response = await interaction.reply({ embeds: [mainEmbed], components: [categoryRow] });
+        const response = await interaction.reply({ 
+            embeds: [mainEmbed], 
+            components: [categoryRow],
+            fetchReply: true 
+        });
 
         const collector = response.createMessageComponentCollector({ time: 60000 });
 
         collector.on("collect", async (i) => {
-            if (i.user.id !== interaction.user.id) return i.reply({ content: "Bạn không thể dùng menu này!", flags: 64 });
+            if (i.user.id !== interaction.user.id) return i.reply({ content: "Menu này không dành cho bạn!", flags: 64 });
 
-            // XỬ LÝ KHI NHẤN NÚT CHỌN DANH MỤC
+            // XỬ LÝ CHỌN DANH MỤC (Nút bấm)
             if (i.isButton()) {
-                let categoryKey = i.customId.replace("open_", "");
+                let categoryKey = i.customId.replace("shop_", "");
                 let items = ITEMS[categoryKey];
 
                 const shopEmbed = new EmbedBuilder()
                     .setTitle(`🛒 CỬA HÀNG: ${categoryKey.toUpperCase()}`)
                     .setColor(0xFFA500)
-                    .setDescription("Chọn vật phẩm từ menu bên dưới để mua:");
+                    .setDescription("Chọn vật phẩm từ danh sách phía dưới:");
 
                 const selectMenu = new StringSelectMenuBuilder()
-                    .setCustomId("buy_item")
-                    .setPlaceholder("Chọn món đồ muốn mua...")
+                    .setCustomId("shop_buy_item")
+                    .setPlaceholder("Bấm vào đây để chọn món đồ...")
                     .addOptions(items.map(item => ({
                         label: item.name,
-                        description: `Giá: ${item.price.toLocaleString()} VND`,
+                        description: `Giá: ${item.price.toLocaleString()} VND - ${item.desc || 'Vật phẩm trang trí'}`,
                         value: item.id
                     })));
 
@@ -76,7 +90,7 @@ module.exports = {
                 await i.update({ embeds: [shopEmbed], components: [menuRow, categoryRow] });
             }
 
-            // XỬ LÝ KHI CHỌN VẬT PHẨM ĐỂ MUA
+            // XỬ LÝ MUA VẬT PHẨM (Select Menu)
             if (i.isStringSelectMenu()) {
                 const itemId = i.values[0];
                 const allItems = [...ITEMS.titles, ...ITEMS.guards, ...ITEMS.charms];
@@ -84,33 +98,60 @@ module.exports = {
 
                 let user = await User.findOne({ userId: i.user.id });
 
-                // Kiểm tra tiền
                 if (user.money < item.price) {
-                    return i.reply({ content: `❌ Bạn không đủ tiền! Cần thêm **${(item.price - user.money).toLocaleString()} VND** nữa.`, flags: 64 });
+                    return i.reply({ content: `❌ Bạn nghèo quá! Cần thêm **${(item.price - user.money).toLocaleString()} VND** để mua món này.`, flags: 64 });
                 }
 
-                // LOGIC CẤP VẬT PHẨM THEO LOẠI
+                let successMsg = "";
+
                 if (item.type === "title") {
-                    if (user.titles.owned.includes(item.name)) return i.reply({ content: "Bạn đã sở hữu danh hiệu này rồi!", flags: 64 });
+                    if (user.titles.owned.includes(item.name)) return i.reply({ content: "Bạn đã có danh hiệu này rồi!", flags: 64 });
                     user.titles.owned.push(item.name);
-                    user.titles.active = item.name; // Tự động đeo luôn
+                    user.titles.active = item.name;
+                    successMsg = `Bạn đã sở hữu danh hiệu **${item.name}**!`;
                 } 
                 else if (item.type === "guard") {
-                    user.securityLevel = item.level; // Nâng cấp cấp độ bảo vệ
+                    if (user.securityLevel >= item.level) return i.reply({ content: "Bạn đã có cấp độ bảo vệ tương đương hoặc cao hơn!", flags: 64 });
+                    user.securityLevel = item.level;
+                    successMsg = `Hệ thống bảo vệ đã được nâng cấp lên: **${item.name}**!`;
                 }
                 else if (item.type === "charm") {
-                    if (item.boost) user.buffs.winRateBoost = item.boost;
-                    // Bạn có thể thêm các loại buff khác ở đây
+                    if (item.boost) {
+                        user.buffs.winRateBoost = item.boost;
+                        successMsg = `Đã kích hoạt **${item.name}**. Tỉ lệ thắng ván tới sẽ tăng thêm!`;
+                    }
+                    if (item.shield) {
+                        user.buffs.shield = item.shield;
+                        successMsg = `Đã kích hoạt **${item.name}**. Nếu thua ván tới sẽ được giảm lỗ!`;
+                    }
                 }
 
-                // Trừ tiền và lưu
                 user.money -= item.price;
                 await user.save();
 
                 await i.reply({ 
-                    content: `🎉 Chúc mừng! Bạn đã mua thành công **${item.name}** với giá **${item.price.toLocaleString()} VND**!`,
+                    content: `🎉 **GIAO DỊCH THÀNH CÔNG!**\n${successMsg}\n💰 Còn lại: **${user.money.toLocaleString()} VND**`,
                     flags: 64 
                 });
+            }
+            
+            // Reset thời gian chờ mỗi khi có tương tác
+            collector.resetTimer();
+        });
+
+        // TỰ ĐỘNG DỌN DẸP KHI HẾT HẠN (60s)
+        collector.on("end", async (collected, reason) => {
+            if (reason === "time") {
+                try {
+                    const closedEmbed = new EmbedBuilder()
+                        .setColor(0x2b2d31)
+                        .setTitle("🏪 CỬA HÀNG ĐÃ ĐÓNG")
+                        .setDescription("Phiên làm việc đã hết hạn. Hãy dùng lại lệnh `/shop` nếu muốn tiếp tục mua sắm.");
+
+                    await interaction.editReply({ embeds: [closedEmbed], components: [] });
+                } catch (e) {
+                    // Tránh lỗi nếu tin nhắn gốc đã bị xóa
+                }
             }
         });
     }

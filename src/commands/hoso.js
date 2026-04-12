@@ -61,7 +61,7 @@ module.exports = {
                     inline: true 
                 }
             )
-            .setImage("https://i.imgur.com/uS3hR7L.png") // Link ảnh trang trí nếu có, hoặc dùng Canvas để vẽ
+            .setImage("https://cdn2.fptshop.com.vn/unsafe/1920x0/filters:format(webp):quality(75)/2023_10_30_638342953175094393_profile-la-gi-thmb.jpg") // Link ảnh trang trí nếu có, hoặc dùng Canvas để vẽ
             .setFooter({ text: `Yêu cầu bởi ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL() })
             .setTimestamp();
 
