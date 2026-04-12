@@ -11,6 +11,7 @@ const cooldownConfig = {
   tuimu: 3600,
   daoham: 180,
   baucua: 60,
+  antrom: 7200,
 };
 
 // format thời gian đẹp hơn
