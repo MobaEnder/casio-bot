@@ -15,9 +15,9 @@ const MIN_BET = 200000;
 /* 🎯 TỈ LỆ XẬP THEO TẦNG */
 /* ======================= */
 function getCrashChance(floor) {
-    if (floor <= 10) return (1 + ((floor - 1) * (7 / 9))) * 1.5;
-    if (floor <= 20) return (7 + ((floor - 11) * (9 / 9))) * 1.9;
-    return (16 + ((floor - 21) * (10 / 15))) * 2.3;
+    if (floor <= 10) return (1 + ((floor - 1) * (7 / 9))) * 1.4;
+    if (floor <= 20) return (7 + ((floor - 11) * (9 / 9))) * 1.7;
+    return (16 + ((floor - 21) * (10 / 15))) * 2;
 }
 
 /* ======================= */
