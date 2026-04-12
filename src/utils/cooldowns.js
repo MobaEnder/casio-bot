@@ -9,7 +9,8 @@ const cooldowns = new Map();
 const cooldownConfig = {
   ping: 5,
   tuimu: 3600,
-  daoham: 120,
+  daoham: 180,
+  baucua: 60,
 };
 
 // format thời gian đẹp hơn
