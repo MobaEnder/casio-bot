@@ -15,8 +15,8 @@ const MIN_BET = 200000; // Đã cố định vé là 200k
 /* 🎯 TỈ LỆ XẬP THEO TẦNG */
 /* ======================= */
 function getCrashChance(floor) {
-    if (floor <= 10) return (1 + ((floor - 1) * (5 / 9))) * 1.3;
-    if (floor <= 20) return (7 + ((floor - 11) * (7 / 9))) * 1.5;
+    if (floor <= 10) return (1 + ((floor - 1) * (4 / 9))) * 1.3;
+    if (floor <= 20) return (7 + ((floor - 11) * (5 / 9))) * 1.5;
     return (16 + ((floor - 21) * (9 / 15))) * 1.9;
 }
 

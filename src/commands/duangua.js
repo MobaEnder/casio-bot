@@ -32,6 +32,7 @@ module.exports = {
             .setTitle("🐎 TRƯỜNG ĐUA NGỰA")
             .setDescription(
                 "🎯 Chọn **ngựa số 1 → 10** để đặt cược!\n" +
+                "🏆 **Cơ cấu giải:** Hạng 1 (x4) | Hạng 2 (x2) | Hạng 3 (x2)\n" +
                 "⏳ Cuộc đua sẽ bắt đầu sau **40 giây**...\n\n" +
                 "🐎 **Danh sách ngựa chiến:**\n" +
                 "1️⃣ 2️⃣ 3️⃣ 4️⃣ 5️⃣\n" +
@@ -54,7 +55,6 @@ module.exports = {
             }
         }
 
-        // Fix cảnh báo Deprecated: dùng withResponse thay cho fetchReply
         const response = await interaction.reply({
             embeds: [embed],
             components: rows,
@@ -104,6 +104,7 @@ module.exports = {
         let user = await User.findOne({ userId: interaction.user.id });
         if (!user || user.money < amount) return interaction.reply({ content: "❌ Không đủ tiền!", flags: 64 });
 
+        // Trừ tiền cược luôn
         user.money -= amount;
         await user.save();
 
@@ -120,11 +121,10 @@ async function startRace(message) {
     const positions = Array(10).fill(0);
     let finished = false;
 
-    // Hàm render đã được fix lỗi RangeError
     const renderTrack = () => {
         let track = "";
         for (let i = 0; i < 10; i++) {
-            const pos = Math.min(positions[i], TRACK_LENGTH); // Luôn giới hạn pos không vượt quá TRACK_LENGTH
+            const pos = Math.min(positions[i], TRACK_LENGTH); 
             const dots = TRACK_LENGTH - pos;
             const line = "▬".repeat(pos) + "🐎" + "  ".repeat(dots > 0 ? dots : 0); 
             track += `**${i + 1}** |${line}|🏁\n`;
@@ -151,32 +151,63 @@ async function startRace(message) {
 
         if (finished) {
             clearInterval(interval);
-            const winner = positions.indexOf(Math.max(...positions)) + 1;
-            await finishRace(message, winner);
+            
+            // Xếp hạng: Tạo mảng chứa thông tin ngựa và quãng đường, sau đó sort từ cao xuống thấp
+            const rankedHorses = positions
+                .map((pos, index) => ({ horse: index + 1, pos }))
+                .sort((a, b) => {
+                    // Nếu quãng đường bằng nhau, random hên xui để phân hạng
+                    if (b.pos === a.pos) return Math.random() > 0.5 ? 1 : -1;
+                    return b.pos - a.pos;
+                });
+
+            await finishRace(message, rankedHorses);
         }
     }, 3500); 
 }
 
-async function finishRace(message, winnerHorse) {
+async function finishRace(message, rankedHorses) {
     const game = games.get(message.id);
     if (!game) return;
 
-    let summary = `🥇 **Ngựa thắng cuộc:** 🐎 **Ngựa số ${winnerHorse}**\n\n`;
+    // Lấy ra Top 3 ngựa thắng cuộc
+    const first = rankedHorses[0].horse;
+    const second = rankedHorses[1].horse;
+    const third = rankedHorses[2].horse;
+
+    let summary = `🥇 **Hạng Nhất (x4):** 🐎 Số ${first}\n` +
+                  `🥈 **Hạng Hai (x2):** 🐎 Số ${second}\n` +
+                  `🥉 **Hạng Ba (x2):** 🐎 Số ${third}\n\n` +
+                  `📊 **KẾT QUẢ ĐẶT CƯỢC:**\n`;
+
+    let hasBets = false;
+
     const promises = Array.from(game.bets.entries()).map(async ([userId, bet]) => {
+        hasBets = true;
         const user = await User.findOne({ userId });
         if (!user) return;
 
-        if (bet.horse === winnerHorse) {
-            const winAmount = Math.floor(bet.amount * 8); 
+        // Xử lý trả thưởng theo cơ cấu mới
+        if (bet.horse === first) {
+            const winAmount = Math.floor(bet.amount * 4); 
             user.money += winAmount;
-            summary += `✅ <@${userId}> +${winAmount.toLocaleString()} VND\n`;
+            summary += `🥇 <@${userId}> thắng **+${winAmount.toLocaleString()} VND** (Ngựa ${bet.horse})\n`;
+        } else if (bet.horse === second || bet.horse === third) {
+            const winAmount = Math.floor(bet.amount * 2); 
+            user.money += winAmount;
+            summary += `🥈 <@${userId}> thắng **+${winAmount.toLocaleString()} VND** (Ngựa ${bet.horse})\n`;
         } else {
-            summary += `❌ <@${userId}> -${bet.amount.toLocaleString()} VND\n`;
+            // Không cộng lại tiền vì đã trừ lúc đầu
+            summary += `❌ <@${userId}> thua trắng **-${bet.amount.toLocaleString()} VND** (Ngựa ${bet.horse})\n`;
         }
         await user.save();
     });
 
     await Promise.all(promises);
+
+    if (!hasBets) {
+        summary += "*Không có ai đặt cược trong vòng này.*";
+    }
 
     const finalEmbed = new EmbedBuilder()
         .setColor("Gold")

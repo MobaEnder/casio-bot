@@ -26,7 +26,7 @@ const FACES = Object.keys(EMOJIS);
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("baucua")
-        .setDescription("🎲 Tạo sòng Bầu Cua bịp - Chơi là cháy túi!"),
+        .setDescription("🎲 Tạo sòng Bầu Cua - Tỉ lệ 50/50 hên xui!"),
 
     async execute(interaction) {
         const user = await User.findOne({ userId: interaction.user.id });
@@ -45,7 +45,7 @@ module.exports = {
                 "👉 Chọn **Nai, Bầu, Gà, Cá, Cua hoặc Tôm** để xuống tiền!\n" +
                 "⏳ Nhà cái sẽ xóc lọ sau **30 giây**..."
             )
-            .setFooter({ text: "Nhà cái đến từ Macau 💎" })
+            .setFooter({ text: "Nhà cái uy tín 50/50 💎" })
             .setTimestamp();
 
         const row1 = new ActionRowBuilder().addComponents(
@@ -63,7 +63,7 @@ module.exports = {
         const msg = await interaction.reply({
             embeds: [embed],
             components: [row1, row2],
-            fetchReply: true, // Fix lỗi withResponse ở phiên bản djs mới
+            fetchReply: true,
         });
 
         games.set(msg.id, {
@@ -79,19 +79,22 @@ module.exports = {
             let rolls = [];
             const betFaces = Array.from(new Set(Array.from(game.bets.values()).map(b => b.face)));
 
-            // 🎲 LOGIC NHÀ CÁI (TỈ LỆ 40% THẮNG - 60% THUA)
+            // 🎲 LOGIC CHÍNH XÁC 50/50
             if (betFaces.length === 0 || betFaces.length === FACES.length) {
+                // Nếu không ai cược hoặc cược hết cả 6 mặt thì random tự nhiên 100%
                 rolls = Array.from({ length: 3 }, () => FACES[Math.floor(Math.random() * FACES.length)]);
             } else {
-                const isWin = Math.random() < 0.40; // 40% Thắng
+                const isWin = Math.random() < 0.50; // Tỉ lệ 50% thắng hoặc thua
+                
                 if (isWin) {
+                    // 50% THẮNG: Chọn 1 mặt người chơi đã cược để chắc chắn trúng, 2 mặt còn lại random
                     const winningFace = betFaces[Math.floor(Math.random() * betFaces.length)];
                     rolls.push(winningFace); 
                     rolls.push(FACES[Math.floor(Math.random() * FACES.length)]);
                     rolls.push(FACES[Math.floor(Math.random() * FACES.length)]);
-                    rolls.sort(() => Math.random() - 0.5); // Trộn xúc xắc
+                    rolls.sort(() => Math.random() - 0.5); // Trộn ngẫu nhiên vị trí xúc xắc
                 } else {
-                    // Cố tình ra mặt KHÔNG AI CƯỢC
+                    // 50% THUA: Chỉ roll ra các mặt người chơi KHÔNG đặt cược
                     const loseFaces = FACES.filter(f => !betFaces.includes(f));
                     rolls = Array.from({ length: 3 }, () => loseFaces[Math.floor(Math.random() * loseFaces.length)]);
                 }
@@ -136,7 +139,7 @@ module.exports = {
                     `🏆 **Người thắng:**\n${winners.slice(0, 10).join("\n") || "Không ai ăn được nhà cái 😢"}\n\n` +
                     `💀 **Người thua:**\n${losers.slice(0, 10).join("\n") || "Không ai 😎"}`
                 )
-                .setFooter({ text: "BOT Casino 💎" })
+                .setFooter({ text: "BOT Casino 50/50 💎" })
                 .setTimestamp();
 
             await msg.edit({
@@ -166,7 +169,7 @@ module.exports = {
 
         const input = new TextInputBuilder()
             .setCustomId("bet_amount")
-            .setLabel("Số tiền bạn muốn tất tay (VND)")
+            .setLabel("Số tiền bạn muốn đặt (VND)")
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
             .setPlaceholder("Tối thiểu 1000");
@@ -192,7 +195,7 @@ module.exports = {
         }
 
         if (user.money < amount) {
-            return interaction.reply({ content: "❌ Không đủ tiền cược! Tính lừa nhà cái à?", flags: 64 });
+            return interaction.reply({ content: "❌ Không đủ tiền cược!", flags: 64 });
         }
 
         const game = games.get(interaction.message.id);
@@ -200,7 +203,7 @@ module.exports = {
             return interaction.reply({ content: "❌ Bàn đã kết thúc trong lúc bạn mải gõ phím!", flags: 64 });
         }
 
-        // --- BƯỚC QUAN TRỌNG: TRỪ TIỀN NGAY TỨC KHẮC ---
+        // TRỪ TIỀN NGAY TỨC KHẮC
         user.money -= amount;
         await user.save();
 
