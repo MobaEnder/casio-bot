@@ -9,15 +9,16 @@ const User = require("../models/User");
 
 const games = new Map();
 const MAX_FLOOR = 36;
-const MIN_BET = 200000; // Đã cố định vé là 200k
+const MIN_BET = 200000; // Vé cố định 200k
 
 /* ======================= */
-/* 🎯 TỈ LỆ XẬP THEO TẦNG */
+/* 🎯 TỈ LỆ XẬP THEO TẦNG (ĐÃ GIẢM ĐỂ AN TOÀN HƠN) */
 /* ======================= */
 function getCrashChance(floor) {
-    if (floor <= 10) return (1 + ((floor - 1) * (4 / 9))) * 1.3;
-    if (floor <= 20) return (7 + ((floor - 11) * (5 / 9))) * 1.5;
-    return (16 + ((floor - 21) * (9 / 15))) * 1.9;
+    // Hệ số đã được hạ xuống (0.8, 1.1, 1.4) giúp người chơi dễ đi xa hơn
+    if (floor <= 10) return (1 + ((floor - 1) * (4 / 9))) * 0.8;
+    if (floor <= 20) return (7 + ((floor - 11) * (5 / 9))) * 1.1;
+    return (16 + ((floor - 21) * (9 / 15))) * 1.4;
 }
 
 /* ======================= */
@@ -43,7 +44,7 @@ function getColorByFloor(floor) {
 /* 📈 THANH TIẾN ĐỘ */
 /* ======================= */
 function getProgressBar(floor) {
-    const safeFloor = Math.min(floor, MAX_FLOOR); // Fix bug vượt quá Max
+    const safeFloor = Math.min(floor, MAX_FLOOR);
     const totalBars = 18;
     const filled = Math.round((safeFloor / MAX_FLOOR) * totalBars);
     const empty = Math.max(0, totalBars - filled);
@@ -52,46 +53,46 @@ function getProgressBar(floor) {
 }
 
 /* ======================= */
-/* ⛏️ RANDOM QUẶNG (CÓ SCALE THEO BET) */
+/* ⛏️ RANDOM QUẶNG (ĐÃ GIẢM GIÁ TRỊ) */
 /* ======================= */
 function getOreByFloor(floor, bet) {
     let ores;
     if (floor <= 10) {
         ores = [
-            { name: "🪨 Đá Thường", min: 3000, max: 5000 },
-            { name: "🟤 Đồng", min: 5000, max: 8000 },
-            { name: "⚙️ Sắt", min: 9000, max: 10000 },
-            { name: "🔩 Bạc Thô", min: 11000, max: 15000 },
-            { name: "💠 Thạch Anh", min: 15000, max: 23000 },
+            { name: "🪨 Đá Thường", min: 1500, max: 3000 },
+            { name: "🟤 Đồng", min: 3000, max: 5000 },
+            { name: "⚙️ Sắt", min: 5000, max: 7000 },
+            { name: "🔩 Bạc Thô", min: 7000, max: 9000 },
+            { name: "💠 Thạch Anh", min: 9000, max: 12000 },
         ];
     } else if (floor <= 20) {
         ores = [
-            { name: "🥈 Bạc", min: 12000, max: 22000 },
-            { name: "🟡 Vàng", min: 30000, max: 35000 },
-            { name: "🔷 Sapphire", min: 30000, max: 35000 },
-            { name: "💎 Kim Cương Thô", min: 35000, max: 40000 },
-            { name: "🔮 Đá Ma Thuật", min: 40000, max: 50000 },
+            { name: "🥈 Bạc", min: 10000, max: 15000 },
+            { name: "🟡 Vàng", min: 15000, max: 20000 },
+            { name: "🔷 Sapphire", min: 18000, max: 23000 },
+            { name: "💎 Kim Cương Thô", min: 20000, max: 25000 },
+            { name: "🔮 Đá Ma Thuật", min: 25000, max: 30000 },
         ];
     } else {
         ores = [
-            { name: "💎 Kim Cương", min: 50000, max: 70000 },
-            { name: "🟥 Ruby", min: 55000, max: 70000 },
-            { name: "🟦 Ngọc Lam", min: 50000, max: 70000 },
-            { name: "🟪 Thạch Tím", min: 60000, max: 70000 },
-            { name: "👑 Quặng Huyền Thoại", min: 60000, max: 70000 },
+            { name: "💎 Kim Cương", min: 30000, max: 40000 },
+            { name: "🟥 Ruby", min: 35000, max: 45000 },
+            { name: "🟦 Ngọc Lam", min: 35000, max: 45000 },
+            { name: "🟪 Thạch Tím", min: 40000, max: 50000 },
+            { name: "👑 Quặng Huyền Thoại", min: 45000, max: 55000 },
         ];
     }
 
     const ore = ores[Math.floor(Math.random() * ores.length)];
-    
-    // Scale: Nếu cược > MIN_BET, giá trị quặng sẽ tăng tương ứng
     const scale = bet / MIN_BET; 
     const baseValue = Math.floor(Math.random() * (ore.max - ore.min + 1)) + ore.min;
-    const multiplier = Math.floor(Math.random() * 4) + 2;
+    
+    // Multiplier thấp hơn (x1.2 đến x2.5) để tiền không tăng quá nhanh
+    const multiplier = parseFloat((Math.random() * 1.3 + 1.2).toFixed(1));
 
     return {
         name: ore.name,
-        value: Math.floor(baseValue * multiplier * scale), // Giá trị đã nhân scale
+        value: Math.floor(baseValue * multiplier * scale),
         multiplier,
     };
 }
@@ -99,21 +100,20 @@ function getOreByFloor(floor, bet) {
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("daoham")
-        .setDescription("⛏️ Đào hầm kiếm quặng - Phí vào hầm cố định 200.000 VND"), // Đã bỏ phần nhập option
+        .setDescription("⛏️ Đào hầm kiếm quặng - Phí vào hầm cố định 200.000 VND"),
 
     async execute(interaction) {
-        const bet = MIN_BET; // Mặc định luôn là 200,000 VND
+        const bet = MIN_BET;
 
         let user = await User.findOne({ userId: interaction.user.id });
         if (!user) user = await User.create({ userId: interaction.user.id });
 
         if (user.banned)
-            return interaction.reply({ content: "🚫 Bạn đang bị cấm tham gia các hoạt động do nợ xấu!", flags: 64 });
+            return interaction.reply({ content: "🚫 Bạn đang bị cấm tham gia do nợ xấu!", flags: 64 });
 
         if (user.money < bet)
-            return interaction.reply({ content: `❌ Bạn không đủ **${bet.toLocaleString()} VND** tiền mua vé xuống hầm!`, flags: 64 });
+            return interaction.reply({ content: `❌ Bạn không đủ **${bet.toLocaleString()} VND** tiền mua vé!`, flags: 64 });
 
-        // Trừ tiền vé
         user.money -= bet;
         await user.save();
 
@@ -124,7 +124,7 @@ module.exports = {
                 `💰 Tiền vé: **${bet.toLocaleString("vi-VN")} VND**\n\n` +
                 `📍 Tầng hiện tại: **0**\n` +
                 `📈 ${getProgressBar(0)}\n\n` +
-                `⚠️ *Lưu ý: Hầm có thể sập bất cứ lúc nào, hãy Rút Tiền đúng lúc!*`
+                `⚠️ *Hầm mỏ đã được gia cố, an toàn hơn nhưng quặng sẽ hiếm hơn!*`
             );
 
         const row = new ActionRowBuilder().addComponents(
@@ -134,10 +134,9 @@ module.exports = {
 
         const msg = await interaction.reply({ embeds: [embed], components: [row], fetchReply: true });
 
-        // Tạo Timeout xóa game nếu người chơi afk
         const timeout = setTimeout(() => {
             games.delete(msg.id);
-            interaction.editReply({ content: "⏳ Bạn đã AFK quá lâu, hầm mỏ đã tự động đóng lại (Mất vé).", components: [] }).catch(()=>{});
+            interaction.editReply({ content: "⏳ Bạn đã AFK quá lâu, hầm mỏ đã đóng lại.", components: [] }).catch(()=>{});
         }, 60000);
 
         games.set(msg.id, {
@@ -153,27 +152,25 @@ module.exports = {
     async handleButton(interaction) {
         const game = games.get(interaction.message.id);
         if (!game || interaction.user.id !== game.userId) {
-            return interaction.reply({ content: "❌ Nút này không dành cho bạn hoặc phiên đã hết hạn!", flags: 64 });
+            return interaction.reply({ content: "❌ Phiên này không thuộc về bạn!", flags: 64 });
         }
 
-        if (game.isProcessing) return interaction.deferUpdate(); // Khóa chống spam click
+        if (game.isProcessing) return interaction.deferUpdate();
         game.isProcessing = true;
 
-        await interaction.deferUpdate(); // Phản hồi ngay để tránh Discord báo lỗi
-        clearTimeout(game.timeoutId); // Xóa timeout cũ
+        await interaction.deferUpdate();
+        clearTimeout(game.timeoutId);
 
         let user = await User.findOne({ userId: interaction.user.id });
 
         if (interaction.customId === "daoham_continue") {
             game.floor++;
 
-            // 1. CHUẨN BỊ NÚT
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder().setCustomId("daoham_continue").setLabel("⛏️ ĐÀO TIẾP").setStyle(ButtonStyle.Success),
                 new ButtonBuilder().setCustomId("daoham_cashout").setLabel("💰 RÚT TIỀN").setStyle(ButtonStyle.Primary)
             );
 
-            // 2. CHECK XẬP HẦM
             const crashChance = getCrashChance(game.floor);
             if (Math.random() * 100 < crashChance) {
                 const embed = new EmbedBuilder()
@@ -181,10 +178,10 @@ module.exports = {
                     .setTitle("💥 XẬP HẦM!!!")
                     .setDescription(
                         `💀 Bạn bị chôn vùi tại tầng: **${game.floor}**\n` +
-                        `💥 Tỉ lệ xập lúc chết: **${crashChance.toFixed(1)}%**\n` +
+                        `💥 Tỉ lệ xập: **${crashChance.toFixed(1)}%**\n` +
                         `📈 ${getProgressBar(game.floor)}\n\n` +
                         `💀 **MẤT TRẮNG VÉ: ${game.bet.toLocaleString("vi-VN")} VND**\n` +
-                        `🗑️ **ĐÁNH MẤT QUẶNG: ${game.totalReward.toLocaleString("vi-VN")} VND**`
+                        `🗑️ **MẤT QUẶNG: ${game.totalReward.toLocaleString("vi-VN")} VND**`
                     )
                     .setThumbnail("https://preview.redd.it/why-even-bother-v0-95755o0poi3e1.jpeg?width=1080&crop=smart&auto=webp&s=73d44d84bf8e1566d0d8bb619da7baff34f4cee3");
 
@@ -192,9 +189,8 @@ module.exports = {
                 return interaction.editReply({ embeds: [embed], components: [] });
             }
 
-            // 3. CHECK PHÁ ĐẢO (MAX FLOOR)
             if (game.floor >= MAX_FLOOR) {
-                const jackpot = game.totalReward * 2; // Thưởng x2 khi phá đảo
+                const jackpot = game.totalReward * 2;
                 user.money += jackpot;
                 await user.save();
 
@@ -203,15 +199,14 @@ module.exports = {
                     .setTitle("👑 PHÁ ĐẢO HẦM MỎ!")
                     .setDescription(
                         `🎉 Chúc mừng bạn đã chạm đến Tầng Lõi **(${MAX_FLOOR}/${MAX_FLOOR})**!\n\n` +
-                        `🎁 **THƯỞNG X2 JACKPOT PHÁ ĐẢO**\n` +
-                        `💰 Tự động rút lui: **${jackpot.toLocaleString("vi-VN")} VND**`
+                        `🎁 **JACKPOT PHÁ ĐẢO x2**\n` +
+                        `💰 Tổng nhận: **${jackpot.toLocaleString("vi-VN")} VND**`
                     );
 
                 games.delete(interaction.message.id);
                 return interaction.editReply({ embeds: [embed], components: [] });
             }
 
-            // 4. CHECK TẦNG RỖNG
             const emptyChance = getEmptyChance(game.floor);
             if (Math.random() * 100 < emptyChance) {
                 const embed = new EmbedBuilder()
@@ -219,20 +214,18 @@ module.exports = {
                     .setTitle("⛏️ TẦNG RỖNG")
                     .setDescription(
                         `📍 Tầng: **${game.floor}**\n` +
-                        `💥 Nguy hiểm: **${crashChance.toFixed(1)}%** | 🕳️ Rỗng: **${emptyChance}%**\n` +
+                        `💥 Nguy hiểm: **${crashChance.toFixed(1)}%**\n` +
                         `📈 ${getProgressBar(game.floor)}\n\n` +
-                        `💨 *Bạn đào mãi nhưng chỉ toàn đất đá...*\n` +
+                        `💨 *Tầng này không có quặng, hãy đào sâu hơn!*\n` +
                         `📦 Túi đồ: **${game.totalReward.toLocaleString("vi-VN")} VND**`
                     );
 
-                // Reset timeout và mở khóa cờ
                 game.timeoutId = setTimeout(() => { games.delete(interaction.message.id); }, 60000);
                 game.isProcessing = false;
                 return interaction.editReply({ embeds: [embed], components: [row] });
             }
 
-            // 5. ĐÀO ĐƯỢC QUẶNG
-            const ore = getOreByFloor(game.floor, game.bet); // Đã truyền bet vào để scale tiền
+            const ore = getOreByFloor(game.floor, game.bet);
             game.totalReward += ore.value;
 
             const embed = new EmbedBuilder()
@@ -242,9 +235,8 @@ module.exports = {
                     `📍 Tầng: **${game.floor}**\n` +
                     `💥 Nguy hiểm: **${crashChance.toFixed(1)}%**\n` +
                     `📈 ${getProgressBar(game.floor)}\n\n` +
-                    `⛏️ Quặng: **${ore.name}**\n` +
-                    `✨ Độ tinh khiết: **x${ore.multiplier}**\n` +
-                    `💵 Trị giá: **+${ore.value.toLocaleString("vi-VN")} VND**\n\n` +
+                    `⛏️ Quặng: **${ore.name}** | ✨ Tinh khiết: **x${ore.multiplier}**\n` +
+                    `💵 Giá trị: **+${ore.value.toLocaleString("vi-VN")} VND**\n\n` +
                     `📦 TỔNG TÚI ĐỒ: **${game.totalReward.toLocaleString("vi-VN")} VND**`
                 );
 
@@ -253,7 +245,6 @@ module.exports = {
             return interaction.editReply({ embeds: [embed], components: [row] });
         }
 
-        // 6. NÚT RÚT TIỀN (CASH OUT)
         if (interaction.customId === "daoham_cashout") {
             user.money += game.totalReward;
             await user.save();
@@ -262,10 +253,9 @@ module.exports = {
                 .setColor(0x00ffcc)
                 .setTitle("🏃‍♂️ RÚT LUI AN TOÀN!")
                 .setDescription(
-                    `📍 Bạn đã quyết định dừng lại tại tầng: **${game.floor}**\n` +
-                    `📈 ${getProgressBar(game.floor)}\n\n` +
-                    `💵 **Lãi thu về:** **${game.totalReward.toLocaleString("vi-VN")} VND**\n` +
-                    `*(Vé ban đầu: ${game.bet.toLocaleString()} VND)*`
+                    `📍 Dừng lại tại tầng: **${game.floor}**\n\n` +
+                    `💵 **Tiền thu về:** **${game.totalReward.toLocaleString("vi-VN")} VND**\n` +
+                    `*(Lợi nhuận ròng: ${(game.totalReward - game.bet).toLocaleString()} VND)*`
                 );
 
             games.delete(interaction.message.id);
