@@ -16,7 +16,7 @@ const FISH_DATA = {
     shallow: { 
         name: "Nước Nông", 
         color: 0x55cdfc, 
-        breakBase: 5, 
+        breakBase: 2, 
         fish: [ 
             { name: "🐟 Cá Rô Đồng", min: 5000, max: 8000 }, 
             { name: "🐠 Cá Bảy Màu", min: 9000, max: 10000 }, 
@@ -28,7 +28,7 @@ const FISH_DATA = {
     mid: { 
         name: "Nước Vừa", 
         color: 0x00a8ff, 
-        breakBase: 5, 
+        breakBase: 2, 
         fish: [ 
             { name: "🐟 Cá Chép", min: 30000, max: 35000 }, 
             { name: "🐠 Cá Tai Tượng", min: 40000, max: 45000 }, 
@@ -40,7 +40,7 @@ const FISH_DATA = {
     deep: { 
         name: "Nước Sâu", 
         color: 0x00416a, 
-        breakBase: 10, 
+        breakBase: 5, 
         fish: [ 
             { name: "🦈 Cá Mập Con", min: 70000, max: 75000 }, 
             { name: "🐟 Cá Ngừ Đại Dương", min: 80000, max: 85000 }, 
@@ -114,7 +114,7 @@ module.exports = {
         // 2. QUĂNG MỒI
         if (action === "cast") {
             const zoneData = FISH_DATA[game.zone];
-            let breakChance = zoneData.breakBase + (game.fishCount * 4);
+            let breakChance = zoneData.breakBase + (game.fishCount * 2);
             let luckMsg = "";
 
             // --- DÙNG BÙA LUCK ---
