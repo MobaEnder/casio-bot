@@ -8,7 +8,9 @@ const {
 const User = require("../models/User");
 
 const games = new Map();
+const abyssCooldowns = new Map(); // ⏳ Bộ nhớ tạm lưu cooldown Đáy Vực
 const ENTRY_FEE = 200000;
+const ABYSS_COOLDOWN_MS = 3 * 60 * 60 * 1000; // 3 tiếng tính bằng milliseconds
 
 const FISH_DATA = {
     shallow: { 
@@ -16,11 +18,11 @@ const FISH_DATA = {
         color: 0x55cdfc, 
         breakBase: 5, 
         fish: [ 
-            { name: "🐟 Cá Rô Đồng", min: 500, max: 1200 }, 
-            { name: "🐠 Cá Bảy Màu", min: 300, max: 800 }, 
-            { name: "🐡 Cá Nóc Nhỏ", min: 1000, max: 2000 }, 
-            { name: "🦀 Cua Đồng", min: 1500, max: 3000 }, 
-            { name: "🦐 Tôm Thẻ", min: 800, max: 1500 } 
+            { name: "🐟 Cá Rô Đồng", min: 5000, max: 8000 }, 
+            { name: "🐠 Cá Bảy Màu", min: 9000, max: 10000 }, 
+            { name: "🐡 Cá Nóc Nhỏ", min: 10000, max: 15000 }, 
+            { name: "🦀 Cua Đồng", min: 15000, max: 20000 }, 
+            { name: "🦐 Tôm Thẻ", min: 20000, max: 25000 } 
         ] 
     },
     mid: { 
@@ -28,11 +30,11 @@ const FISH_DATA = {
         color: 0x00a8ff, 
         breakBase: 10, 
         fish: [ 
-            { name: "🐟 Cá Chép", min: 3000, max: 6000 }, 
-            { name: "🐠 Cá Tai Tượng", min: 5000, max: 8000 }, 
-            { name: "🦑 Mực Ống", min: 7000, max: 12000 }, 
-            { name: "🐢 Rùa Sen", min: 10000, max: 18000 }, 
-            { name: "🐍 Lươn Điện", min: 15000, max: 25000 } 
+            { name: "🐟 Cá Chép", min: 30000, max: 35000 }, 
+            { name: "🐠 Cá Tai Tượng", min: 40000, max: 45000 }, 
+            { name: "🦑 Mực Ống", min: 50000, max: 55000 }, 
+            { name: "🐢 Rùa Sen", min: 60000, max: 65000 }, 
+            { name: "🐍 Lươn Điện", min: 65000, max: 70000 } 
         ] 
     },
     deep: { 
@@ -40,11 +42,11 @@ const FISH_DATA = {
         color: 0x00416a, 
         breakBase: 18, 
         fish: [ 
-            { name: "🦈 Cá Mập Con", min: 15000, max: 25000 }, 
-            { name: "🐟 Cá Ngừ Đại Dương", min: 20000, max: 35000 }, 
-            { name: "🦑 Mực Khổng Lồ", min: 30000, max: 45000 }, 
-            { name: "🐡 Cá Mặt Trăng", min: 40000, max: 60000 }, 
-            { name: "🦀 Cua Hoàng Đế", min: 50000, max: 80000 } 
+            { name: "🦈 Cá Mập Con", min: 70000, max: 75000 }, 
+            { name: "🐟 Cá Ngừ Đại Dương", min: 80000, max: 85000 }, 
+            { name: "🦑 Mực Khổng Lồ", min: 90000, max: 95000 }, 
+            { name: "🐡 Cá Mặt Trăng", min: 90000, max: 93000 }, 
+            { name: "🦀 Cua Hoàng Đế", min: 93000, max: 96000 } 
         ] 
     },
     abyss: { 
@@ -52,11 +54,11 @@ const FISH_DATA = {
         color: 0x1a1a1a, 
         breakBase: 25, 
         fish: [ 
-            { name: "🐉 Long Ngư", min: 40000, max: 70000 }, 
-            { name: "🐙 Quái Vật Kraken", min: 70000, max: 120000 }, 
-            { name: "💎 Cá Pha Lê", min: 120000, max: 200000 }, 
-            { name: "🔱 Quy Thần Đáy Biển", min: 250000, max: 450000 }, 
-            { name: "👑 Cá Hoàng Gia", min: 500000, max: 750000 } 
+            { name: "🐉 Long Ngư", min: 100000, max: 1200000 }, 
+            { name: "🐙 Quái Vật Kraken", min: 1200000, max: 1500000 }, 
+            { name: "💎 Cá Pha Lê", min: 1500000, max: 2000000 }, 
+            { name: "🔱 Quy Thần Đáy Biển", min: 2500000, max: 3000000 }, 
+            { name: "👑 Cá Hoàng Gia", min: 3500000, max: 4000000 } 
         ] 
     }
 };
@@ -85,7 +87,7 @@ module.exports = {
                 { name: "🌊 Nước Nông", value: "An toàn", inline: true },
                 { name: "💧 Nước Vừa", value: "Rủi ro thấp", inline: true },
                 { name: "🟦 Nước Sâu", value: "Rủi ro cao", inline: true },
-                { name: "⬛ Đáy Vực", value: "Nguy hiểm", inline: true }
+                { name: "⬛ Đáy Vực", value: "1 con/3 tiếng", inline: true }
             );
 
         const row = new ActionRowBuilder().addComponents(
@@ -113,13 +115,32 @@ module.exports = {
             return interaction.reply({ content: "❌ Phiên này không thuộc về bạn!", flags: 64 });
         }
 
-        // 🛠️ FIX: Tách ID chuẩn hơn
         const parts = interaction.customId.split("_");
         const action = parts[1]; // "select", "cast", "collect"
         const value = parts[2];  // "shallow", "mid", "deep", "abyss"
 
         // 1. CHỌN VÙNG NƯỚC
         if (action === "select") {
+            // ⏳ Kiểm tra cooldown nếu chọn Đáy Vực
+            if (value === "abyss") {
+                const lastTime = abyssCooldowns.get(interaction.user.id) || 0;
+                const now = Date.now();
+
+                if (now < lastTime + ABYSS_COOLDOWN_MS) {
+                    const timeLeft = lastTime + ABYSS_COOLDOWN_MS - now;
+                    const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+                    const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+                    
+                    return interaction.reply({ 
+                        content: `🌪️ Biển động dữ dội! Bạn phải chờ **${hours} giờ ${minutes} phút** nữa mới có thể vào Đáy Vực.`, 
+                        flags: 64 
+                    });
+                }
+                
+                // Nếu đủ điều kiện, ghi nhận thời gian bắt đầu cooldown
+                abyssCooldowns.set(interaction.user.id, now);
+            }
+
             game.zone = value;
             return updateGameUI(interaction, game);
         }
@@ -173,21 +194,31 @@ module.exports = {
 async function updateGameUI(interaction, game, lastActionMsg = "") {
     const zoneData = FISH_DATA[game.zone];
     const breakChance = zoneData.breakBase + (game.fishCount * 4);
+    
+    // 🛑 Kiểm tra xem người chơi có đang ở Đáy vực và đã câu được cá chưa
+    const isAbyssMaxed = game.zone === "abyss" && game.fishCount >= 1;
 
     const embed = new EmbedBuilder()
         .setColor(zoneData.color)
         .setTitle(`🎣 ĐANG CÂU TẠI: ${zoneData.name.toUpperCase()}`)
         .setDescription(
             `${lastActionMsg ? lastActionMsg + "\n\n" : ""}` +
-            `🛒 Giỏ cá: **${game.fishCount}** con\n` +
+            `🛒 Giỏ cá: **${game.fishCount}** con ${isAbyssMaxed ? "(Đã đầy)" : ""}\n` +
             `💰 Tổng trị giá: **${game.totalValue.toLocaleString()} VND**\n` +
             `⚠️ Tỉ lệ đứt dây tiếp theo: **${breakChance.toFixed(0)}%**`
         );
 
-    // 🛠️ FIX: Đồng bộ lại customId cho các nút ở màn hình câu cá
     const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId("cauca_cast_action").setLabel("🎣 QUĂNG MỒI TIẾP").setStyle(ButtonStyle.Success),
-        new ButtonBuilder().setCustomId("cauca_collect_action").setLabel("🚢 THU LƯỚI VỀ").setStyle(ButtonStyle.Primary).setDisabled(game.fishCount === 0)
+        new ButtonBuilder()
+            .setCustomId("cauca_cast_action")
+            .setLabel(isAbyssMaxed ? "🔒 KHÔNG THỂ CÂU THÊM" : "🎣 QUĂNG MỒI TIẾP")
+            .setStyle(isAbyssMaxed ? ButtonStyle.Secondary : ButtonStyle.Success)
+            .setDisabled(isAbyssMaxed), // Khóa nút nếu ở đáy vực và đã có 1 con
+        new ButtonBuilder()
+            .setCustomId("cauca_collect_action")
+            .setLabel("🚢 THU LƯỚI VỀ")
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(game.fishCount === 0)
     );
 
     return interaction.update({ embeds: [embed], components: [row] });
