@@ -47,7 +47,6 @@ module.exports = {
                 "👉 **Luật chơi:** Chọn linh vật để đặt cược. Ăn gấp đôi nếu trúng 1 mặt, gấp ba nếu trúng 2 mặt!\n\n" +
                 "⏳ Nhà cái sẽ xóc sau **30 giây**..."
             )
-            .setThumbnail("https://i.imgur.com/83p1f8Z.png") // Link ảnh bầu cua nếu có
             .setFooter({ text: "💰 Chúc các đại gia hên xui may mắn!" })
             .setTimestamp();
 
@@ -111,27 +110,27 @@ module.exports = {
 
                 if (matchCount > 0) {
                     // --- LOGIC THẮNG ---
-                    if (uData.buffs.winRateBoost > 0) {
+                    if (uData.buffs?.winRateBoost > 0) {
                         usedBuffs.push(`🍀 Luck ${uData.buffs.winRateBoost * 100}%`);
-                        uData.buffs.winRateBoost = 0; // Dùng là mất
+                        uData.buffs.winRateBoost = 0;
                     }
                     const profit = bet.amount * matchCount;
                     const totalReturn = bet.amount + profit;
                     
                     uData.money += totalReturn;
                     uData.stats.win++;
-                    winners.push(`✅ <@${userId}> +**${profit.toLocaleString()}** (Trúng ${matchCount}x ${EMOJIS[bet.face]})${usedBuffs.length ? ` [${usedBuffs.join(", ")}]` : ""}`);
+                    winners.push(`✅ <@${userId}> +**${profit.toLocaleString()}** (x${matchCount} ${EMOJIS[bet.face]})${usedBuffs.length ? ` [${usedBuffs.join(", ")}]` : ""}`);
                 } else {
                     // --- LOGIC THUA ---
                     let lostAmt = bet.amount;
-                    if (uData.buffs.shield > 0) {
+                    if (uData.buffs?.shield > 0) {
                         const refund = Math.floor(bet.amount * uData.buffs.shield);
                         uData.money += refund;
                         lostAmt -= refund;
                         usedBuffs.push(`🔰 Khiên ${uData.buffs.shield * 100}%`);
                         uData.buffs.shield = 0;
                     }
-                    if (uData.buffs.winRateBoost > 0) {
+                    if (uData.buffs?.winRateBoost > 0) {
                         usedBuffs.push(`🍀 Luck ${uData.buffs.winRateBoost * 100}%`);
                         uData.buffs.winRateBoost = 0;
                     }
@@ -143,6 +142,5 @@ module.exports = {
             }
 
             const resultEmbed = new EmbedBuilder()
-                .setColor(0xffd700)
-                .setTitle("🎉 KẾT QU
+                .setColor(0xffd
  
