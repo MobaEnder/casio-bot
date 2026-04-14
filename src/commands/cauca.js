@@ -28,7 +28,7 @@ const FISH_DATA = {
     mid: { 
         name: "Nước Vừa", 
         color: 0x00a8ff, 
-        breakBase: 10, 
+        breakBase: 8, 
         fish: [ 
             { name: "🐟 Cá Chép", min: 30000, max: 35000 }, 
             { name: "🐠 Cá Tai Tượng", min: 40000, max: 45000 }, 
@@ -40,7 +40,7 @@ const FISH_DATA = {
     deep: { 
         name: "Nước Sâu", 
         color: 0x00416a, 
-        breakBase: 18, 
+        breakBase: 12, 
         fish: [ 
             { name: "🦈 Cá Mập Con", min: 70000, max: 75000 }, 
             { name: "🐟 Cá Ngừ Đại Dương", min: 80000, max: 85000 }, 
@@ -52,7 +52,7 @@ const FISH_DATA = {
     abyss: { 
         name: "Đáy Vực", 
         color: 0x1a1a1a, 
-        breakBase: 25, 
+        breakBase: 30, 
         fish: [ 
             { name: "🐉 Long Ngư", min: 100000, max: 1200000 }, 
             { name: "🐙 Quái Vật Kraken", min: 1200000, max: 1500000 }, 
