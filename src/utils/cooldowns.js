@@ -11,6 +11,7 @@ const cooldownConfig = {
     duangua: 5,
     daga: 10,
     cauca:180,
+    taixiu:15,
 };
 
 // 🛠️ Đã sửa: Hỗ trợ hiển thị cả Giờ, Phút, Giây
