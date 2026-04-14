@@ -58,37 +58,40 @@ function getProgressBar(floor) {
 function getOreByFloor(floor, bet) {
     let ores;
     if (floor <= 10) {
+        // Tầng 1-10: Thu nhập ổn định, đào khoảng 5-7 tầng là hòa vốn vé
         ores = [
-            { name: "🪨 Đá Thường", min: 1500, max: 3000 },
-            { name: "🟤 Đồng", min: 3000, max: 5000 },
-            { name: "⚙️ Sắt", min: 5000, max: 7000 },
-            { name: "🔩 Bạc Thô", min: 7000, max: 9000 },
-            { name: "💠 Thạch Anh", min: 9000, max: 12000 },
+            { name: "🪨 Đá Thường", min: 8000, max: 12000 },
+            { name: "🟤 Đồng", min: 12000, max: 18000 },
+            { name: "⚙️ Sắt", min: 18000, max: 25000 },
+            { name: "🔩 Bạc Thô", min: 25000, max: 35000 },
+            { name: "💠 Thạch Anh", min: 35000, max: 45000 },
         ];
     } else if (floor <= 20) {
+        // Tầng 11-20: Bắt đầu có lãi lớn, mỗi quặng giá trị cao
         ores = [
-            { name: "🥈 Bạc", min: 10000, max: 15000 },
-            { name: "🟡 Vàng", min: 15000, max: 20000 },
-            { name: "🔷 Sapphire", min: 18000, max: 23000 },
-            { name: "💎 Kim Cương Thô", min: 20000, max: 25000 },
-            { name: "🔮 Đá Ma Thuật", min: 25000, max: 30000 },
+            { name: "🥈 Bạc", min: 50000, max: 70000 },
+            { name: "🟡 Vàng", min: 70000, max: 95000 },
+            { name: "🔷 Sapphire", min: 95000, max: 120000 },
+            { name: "💎 Kim Cương Thô", min: 120000, max: 160000 },
+            { name: "🔮 Đá Ma Thuật", min: 160000, max: 220000 },
         ];
     } else {
+        // Tầng 21+: Siêu lợi nhuận, rủi ro sập hầm cao nhưng đào được là giàu
         ores = [
-            { name: "💎 Kim Cương", min: 30000, max: 40000 },
-            { name: "🟥 Ruby", min: 35000, max: 45000 },
-            { name: "🟦 Ngọc Lam", min: 35000, max: 45000 },
-            { name: "🟪 Thạch Tím", min: 40000, max: 50000 },
-            { name: "👑 Quặng Huyền Thoại", min: 45000, max: 55000 },
+            { name: "💎 Kim Cương", min: 250000, max: 350000 },
+            { name: "🟥 Ruby", min: 350000, max: 500000 },
+            { name: "🟦 Ngọc Lam", min: 500000, max: 750000 },
+            { name: "🟪 Thạch Tím", min: 800000, max: 1200000 },
+            { name: "👑 Quặng Huyền Thoại", min: 1500000, max: 2500000 },
         ];
     }
 
     const ore = ores[Math.floor(Math.random() * ores.length)];
-    const scale = bet / MIN_BET; 
+    const scale = bet / 200000; // Tính theo mốc vé 200k
     const baseValue = Math.floor(Math.random() * (ore.max - ore.min + 1)) + ore.min;
     
-    // Multiplier thấp hơn (x1.2 đến x2.5) để tiền không tăng quá nhanh
-    const multiplier = parseFloat((Math.random() * 1.3 + 1.2).toFixed(1));
+    // Giữ multiplier để tạo sự biến thiên giá trị quặng (x1.5 đến x3.0)
+    const multiplier = parseFloat((Math.random() * 1.5 + 1.5).toFixed(1));
 
     return {
         name: ore.name,
