@@ -55,10 +55,11 @@ module.exports = {
             }
         }
 
+        // Đã sử dụng withResponse (chuẩn djs v14+)
         const response = await interaction.reply({
             embeds: [embed],
             components: rows,
-            withResponse: true,
+            withResponse: true, 
         });
 
         const msg = response.resource.message;
@@ -75,7 +76,7 @@ module.exports = {
     async handleButton(interaction) {
         const game = games.get(interaction.message.id);
         if (!game || game.isStarted) {
-            return interaction.reply({ content: "❌ Cuộc đua đã bắt đầu!", flags: 64 });
+            return interaction.reply({ content: "❌ Cuộc đua đã bắt đầu hoặc đã kết thúc!", flags: 64 });
         }
 
         const horse = Number(interaction.customId.split("_")[1]);
@@ -137,7 +138,13 @@ async function startRace(message) {
         .setTitle("🐎 CUỘC ĐUA ĐANG DIỄN RA!")
         .setDescription(renderTrack());
 
-    await message.edit({ embeds: [embed], components: [] });
+    // FIX 1: Bắt lỗi ngay lúc bắt đầu cập nhật giao diện đua (tránh sập nếu tin nhắn vừa bị xóa)
+    try {
+        await message.edit({ embeds: [embed], components: [] });
+    } catch (err) {
+        games.delete(message.id);
+        return; 
+    }
 
     const interval = setInterval(async () => {
         for (let i = 0; i < 10; i++) {
@@ -147,7 +154,14 @@ async function startRace(message) {
             if (positions[i] >= TRACK_LENGTH) finished = true;
         }
 
-        await message.edit({ embeds: [embed.setDescription(renderTrack())] }).catch(() => {});
+        // FIX 2: Bắt lỗi trong quá trình đua, nếu lỗi thì dừng cuộc đua ngay lập tức
+        try {
+            await message.edit({ embeds: [embed.setDescription(renderTrack())] });
+        } catch (error) {
+            clearInterval(interval);
+            games.delete(message.id);
+            return; 
+        }
 
         if (finished) {
             clearInterval(interval);
@@ -215,6 +229,12 @@ async function finishRace(message, rankedHorses) {
         .setDescription(summary)
         .setTimestamp();
 
-    await message.edit({ embeds: [finalEmbed] });
-    games.delete(message.id);
+    // FIX 3: Bắt lỗi khi chốt kết quả
+    try {
+        await message.edit({ embeds: [finalEmbed] });
+    } catch (error) {
+        console.error(`Không thể hiện kết quả đua ngựa ở message ID: ${message.id}`);
+    } finally {
+        games.delete(message.id);
+    }
 }
