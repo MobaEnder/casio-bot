@@ -116,12 +116,11 @@ module.exports = {
         }
 
         const parts = interaction.customId.split("_");
-        const action = parts[1]; // "select", "cast", "collect"
-        const value = parts[2];  // "shallow", "mid", "deep", "abyss"
+        const action = parts[1]; 
+        const value = parts[2];  
 
         // 1. CHỌN VÙNG NƯỚC
         if (action === "select") {
-            // ⏳ Kiểm tra cooldown nếu chọn Đáy Vực
             if (value === "abyss") {
                 const lastTime = abyssCooldowns.get(interaction.user.id) || 0;
                 const now = Date.now();
@@ -131,20 +130,21 @@ module.exports = {
                     const hours = Math.floor(timeLeft / (1000 * 60 * 60));
                     const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
                     
+                    // Dùng followUp hoặc reply nhưng KHÔNG cập nhật giao diện game
                     return interaction.reply({ 
-                        content: `🌪️ Biển động dữ dội! Bạn phải chờ **${hours} giờ ${minutes} phút** nữa mới có thể vào Đáy Vực.`, 
+                        content: `🌪️ Đáy Vực đang động! Hãy quay lại sau **${hours} giờ ${minutes} phút**.`, 
                         flags: 64 
                     });
                 }
-                
-                // Nếu đủ điều kiện, ghi nhận thời gian bắt đầu cooldown
+                // CHỈ KHI HẾT COOLDOWN MỚI SET THỜI GIAN MỚI
                 abyssCooldowns.set(interaction.user.id, now);
             }
 
             game.zone = value;
+            // Cập nhật giao diện sang màn hình câu cá
             return updateGameUI(interaction, game);
         }
-
+        
         // 2. CÂU TIẾP
         if (action === "cast") {
             const zoneData = FISH_DATA[game.zone];
