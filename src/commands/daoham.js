@@ -16,8 +16,8 @@ const MIN_BET = 200000; // Vé cố định 200k
 /* ======================= */
 function getCrashChance(floor) {
     // Hệ số đã được hạ xuống (0.8, 1.1, 1.4) giúp người chơi dễ đi xa hơn
-    if (floor <= 10) return (1 + ((floor - 1) * (4 / 9))) * 0.8;
-    if (floor <= 20) return (7 + ((floor - 11) * (5 / 9))) * 1.1;
+    if (floor <= 10) return (1 + ((floor - 1) * (4 / 9))) * 0.9;
+    if (floor <= 20) return (7 + ((floor - 11) * (5 / 9))) * 1.2;
     return (16 + ((floor - 21) * (9 / 15))) * 1.4;
 }
 
