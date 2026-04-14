@@ -11,10 +11,54 @@ const games = new Map();
 const ENTRY_FEE = 200000;
 
 const FISH_DATA = {
-    shallow: { name: "Nước Nông", color: 0x55cdfc, breakBase: 5, fish: [ { name: "🐟 Cá Rô Đồng", min: 15000, max: 25000 }, { name: "🐠 Cá Bảy Màu", min: 10000, max: 20000 }, { name: "🐡 Cá Nóc Nhỏ", min: 20000, max: 35000 }, { name: "🦀 Cua Đồng", min: 25000, max: 40000 }, { name: "🦐 Tôm Thẻ", min: 18000, max: 28000 } ] },
-    mid: { name: "Nước Vừa", color: 0x00a8ff, breakBase: 10, fish: [ { name: "🐟 Cá Chép", min: 40000, max: 70000 }, { name: "🐠 Cá Tai Tượng", min: 50000, max: 90000 }, { name: "🦑 Mực Ống", min: 70000, max: 110000 }, { name: "🐢 Rùa Sen", min: 100000, max: 150000 }, { name: "🐍 Lươn Điện", min: 120000, max: 180000 } ] },
-    deep: { name: "Nước Sâu", color: 0x00416a, breakBase: 18, fish: [ { name: "🦈 Cá Mập Con", min: 150000, max: 250000 }, { name: "🐟 Cá Ngừ Đại Dương", min: 200000, max: 350000 }, { name: "🦑 Mực Khổng Lồ", min: 300000, max: 500000 }, { name: "🐡 Cá Mặt Trăng", min: 400000, max: 650000 }, { name: "🦀 Cua Hoàng Đế", min: 500000, max: 800000 } ] },
-    abyss: { name: "Đáy Vực", color: 0x1a1a1a, breakBase: 25, fish: [ { name: "🐉 Long Ngư", min: 800000, max: 1500000 }, { name: "🐙 Quái Vật Kraken", min: 1500000, max: 2500000 }, { name: "💎 Cá Pha Lê", min: 2500000, max: 4000000 }, { name: "🔱 Quy Thần Đáy Biển", min: 4000000, max: 6000000 }, { name: "👑 Cá Hoàng Gia", min: 6000000, max: 10000000 } ] }
+    shallow: { 
+        name: "Nước Nông", 
+        color: 0x55cdfc, 
+        breakBase: 5, 
+        fish: [ 
+            { name: "🐟 Cá Rô Đồng", min: 500, max: 1200 }, 
+            { name: "🐠 Cá Bảy Màu", min: 300, max: 800 }, 
+            { name: "🐡 Cá Nóc Nhỏ", min: 1000, max: 2000 }, 
+            { name: "🦀 Cua Đồng", min: 1500, max: 3000 }, 
+            { name: "🦐 Tôm Thẻ", min: 800, max: 1500 } 
+        ] 
+    },
+    mid: { 
+        name: "Nước Vừa", 
+        color: 0x00a8ff, 
+        breakBase: 10, 
+        fish: [ 
+            { name: "🐟 Cá Chép", min: 3000, max: 6000 }, 
+            { name: "🐠 Cá Tai Tượng", min: 5000, max: 8000 }, 
+            { name: "🦑 Mực Ống", min: 7000, max: 12000 }, 
+            { name: "🐢 Rùa Sen", min: 10000, max: 18000 }, 
+            { name: "🐍 Lươn Điện", min: 15000, max: 25000 } 
+        ] 
+    },
+    deep: { 
+        name: "Nước Sâu", 
+        color: 0x00416a, 
+        breakBase: 18, 
+        fish: [ 
+            { name: "🦈 Cá Mập Con", min: 15000, max: 25000 }, 
+            { name: "🐟 Cá Ngừ Đại Dương", min: 20000, max: 35000 }, 
+            { name: "🦑 Mực Khổng Lồ", min: 30000, max: 45000 }, 
+            { name: "🐡 Cá Mặt Trăng", min: 40000, max: 60000 }, 
+            { name: "🦀 Cua Hoàng Đế", min: 50000, max: 80000 } 
+        ] 
+    },
+    abyss: { 
+        name: "Đáy Vực", 
+        color: 0x1a1a1a, 
+        breakBase: 25, 
+        fish: [ 
+            { name: "🐉 Long Ngư", min: 40000, max: 70000 }, 
+            { name: "🐙 Quái Vật Kraken", min: 70000, max: 120000 }, 
+            { name: "💎 Cá Pha Lê", min: 120000, max: 200000 }, 
+            { name: "🔱 Quy Thần Đáy Biển", min: 250000, max: 450000 }, 
+            { name: "👑 Cá Hoàng Gia", min: 500000, max: 750000 } 
+        ] 
+    }
 };
 
 module.exports = {

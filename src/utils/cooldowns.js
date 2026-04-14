@@ -10,6 +10,7 @@ const cooldownConfig = {
     antrom: 7200,
     duangua: 5,
     daga: 10,
+    cauca:180,
 };
 
 // 🛠️ Đã sửa: Hỗ trợ hiển thị cả Giờ, Phút, Giây
