@@ -12,6 +12,7 @@ const cooldownConfig = {
     daga: 10,
     cauca:180,
     taixiu:15,
+    chungkhoan:180,
 };
 
 // 🛠️ Đã sửa: Hỗ trợ hiển thị cả Giờ, Phút, Giây
