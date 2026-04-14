@@ -9,11 +9,14 @@ const User = require("../models/User");
 
 const games = new Map();
 const MAX_FLOOR = 36;
-const MIN_BET = 200000; 
+const MIN_BET = 200000; // Vé cố định 200k
 
+/* ======================= */
+/* 🎯 TỈ LỆ XẬP THEO TẦNG */
+/* ======================= */
 function getCrashChance(floor) {
-    if (floor <= 10) return (1 + ((floor - 1) * (4 / 9))) * 0.9;
-    if (floor <= 20) return (7 + ((floor - 11) * (5 / 9))) * 1.2;
+    if (floor <= 10) return (1 + ((floor - 1) * (4 / 9))) * 0.8;
+    if (floor <= 20) return (7 + ((floor - 11) * (5 / 9))) * 1.1;
     return (16 + ((floor - 21) * (9 / 15))) * 1.4;
 }
 
@@ -24,10 +27,10 @@ function getEmptyChance(floor) {
 }
 
 function getColorByFloor(floor) {
-    if (floor <= 10) return 0x00ff00; 
-    if (floor <= 20) return 0xffcc00; 
-    if (floor <= 30) return 0xff8800; 
-    return 0xff0000; 
+    if (floor <= 10) return 0x00ff00;
+    if (floor <= 20) return 0xffcc00;
+    if (floor <= 30) return 0xff8800;
+    return 0xff0000;
 }
 
 function getProgressBar(floor) {
@@ -42,34 +45,34 @@ function getOreByFloor(floor, bet) {
     let ores;
     if (floor <= 10) {
         ores = [
-            { name: "🪨 Đá Thường", min: 5000, max: 8000 },
-            { name: "🟤 Đồng", min: 8000, max: 12000 },
-            { name: "⚙️ Sắt", min: 12000, max: 18000 },
-            { name: "🔩 Bạc Thô", min: 18000, max: 25000 },
-            { name: "💠 Thạch Anh", min: 25000, max: 35000 },
+            { name: "🪨 Đá Thường", min: 8000, max: 12000 },
+            { name: "🟤 Đồng Thô", min: 12000, max: 18000 },
+            { name: "⚙️ Sắt", min: 18000, max: 25000 },
+            { name: "🔩 Bạc Thô", min: 25000, max: 35000 },
+            { name: "💠 Thạch Anh", min: 35000, max: 45000 },
         ];
     } else if (floor <= 20) {
         ores = [
-            { name: "🥈 Bạc", min: 35000, max: 40000 },
-            { name: "🟡 Vàng", min: 45000, max: 50000 },
-            { name: "🔷 Sapphire", min: 55000, max: 60000 },
-            { name: "💎 Kim Cương Thô", min: 65000, max: 70000 },
-            { name: "🔮 Đá Ma Thuật", min: 70000, max: 80000 },
+            { name: "🥈 Bạc", min: 50000, max: 70000 },
+            { name: "🟡 Vàng", min: 70000, max: 95000 },
+            { name: "🔷 Sapphire", min: 95000, max: 120000 },
+            { name: "💎 Kim Cương Thô", min: 120000, max: 160000 },
+            { name: "🔮 Đá Ma Thuật", min: 160000, max: 220000 },
         ];
     } else {
         ores = [
-            { name: "💎 Kim Cương", min: 200000, max: 300000 },
-            { name: "🟥 Ruby", min: 300000, max: 450000 },
-            { name: "🟦 Ngọc Lam", min: 450000, max: 650000 },
-            { name: "🟪 Thạch Tím", min: 700000, max: 1000000 },
-            { name: "👑 Quặng Huyền Thoại", min: 1200000, max: 1800000 },
+            { name: "💎 Kim Cương", min: 250000, max: 350000 },
+            { name: "🟥 Ruby", min: 350000, max: 500000 },
+            { name: "🟦 Ngọc Lam", min: 500000, max: 750000 },
+            { name: "🟪 Thạch Tím", min: 800000, max: 1200000 },
+            { name: "👑 Quặng Huyền Thoại", min: 1500000, max: 2500000 },
         ];
     }
 
     const ore = ores[Math.floor(Math.random() * ores.length)];
-    const scale = bet / 200000; 
+    const scale = bet / 200000;
     const baseValue = Math.floor(Math.random() * (ore.max - ore.min + 1)) + ore.min;
-    const multiplier = parseFloat((Math.random() * 1.3 + 1.2).toFixed(1));
+    const multiplier = parseFloat((Math.random() * 1.5 + 1.5).toFixed(1));
 
     return {
         name: ore.name,
@@ -88,8 +91,11 @@ module.exports = {
         let user = await User.findOne({ userId: interaction.user.id });
         if (!user) user = await User.create({ userId: interaction.user.id });
 
-        if (user.banned) return interaction.reply({ content: "🚫 Bạn đang bị cấm tham gia!", flags: 64 });
-        if (user.money < bet) return interaction.reply({ content: `❌ Bạn không đủ **${bet.toLocaleString()} VND**!`, flags: 64 });
+        if (user.banned)
+            return interaction.reply({ content: "🚫 Bạn đang bị cấm tham gia!", flags: 64 });
+
+        if (user.money < bet)
+            return interaction.reply({ content: `❌ Bạn không đủ **${bet.toLocaleString()} VND** tiền mua vé!`, flags: 64 });
 
         user.money -= bet;
         await user.save();
@@ -98,10 +104,10 @@ module.exports = {
             .setColor(0x00ff00)
             .setTitle("⛏️ BẮT ĐẦU KHAI THÁC")
             .setDescription(
-                `💰 Tiền vé: **${bet.toLocaleString()} VND**\n\n` +
+                `💰 Tiền vé: **${bet.toLocaleString("vi-VN")} VND**\n\n` +
                 `📍 Tầng hiện tại: **0**\n` +
                 `📈 ${getProgressBar(0)}\n\n` +
-                `⚠️ *Sử dụng các nút bên dưới để đào sâu hơn hoặc rút lui!*`
+                `⚠️ *Hệ thống sẽ tự động dùng Bùa/Khiên nếu bạn có!*`
             );
 
         const row = new ActionRowBuilder().addComponents(
@@ -142,34 +148,28 @@ module.exports = {
 
         if (interaction.customId === "daoham_continue") {
             game.floor++;
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId("daoham_continue").setLabel("⛏️ ĐÀO TIẾP").setStyle(ButtonStyle.Success),
-                new ButtonBuilder().setCustomId("daoham_cashout").setLabel("💰 RÚT TIỀN").setStyle(ButtonStyle.Primary)
-            );
-
             let crashChance = getCrashChance(game.floor);
-            let luckMsg = "";
+            let buffInfo = "";
 
-            // --- KIỂM TRA BÙA LUCK ---
-            if (user.buffs.winRateBoost > 0) {
-                const reduction = crashChance * user.buffs.winRateBoost;
-                crashChance -= reduction;
-                luckMsg = `\n🍀 **Đã dùng Bùa Luck (-${user.buffs.winRateBoost * 100}% tỉ lệ xập)!**`;
-                user.buffs.winRateBoost = 0; // Xóa bùa sau khi dùng
+            // --- XỬ LÝ LUCK (🍀) ---
+            if (user.buffs?.winRateBoost > 0) {
+                crashChance = crashChance * (1 - user.buffs.winRateBoost); // Giảm % tỉ lệ xập
+                buffInfo += `🍀 Luck -${user.buffs.winRateBoost * 100}% | `;
+                user.buffs.winRateBoost = 0; // Reset bùa
                 await user.save();
             }
 
+            // KIỂM TRA XẬP HẦM
             if (Math.random() * 100 < crashChance) {
-                let shieldMsg = "";
-                let lostReward = game.totalReward;
+                let shieldSaved = 0;
+                let shieldInfo = "";
 
-                // --- KIỂM TRA KHIÊN BẢO VỆ ---
-                if (user.buffs.shield > 0) {
-                    const savedAmount = Math.floor(game.totalReward * user.buffs.shield);
-                    user.money += savedAmount;
-                    lostReward -= savedAmount;
-                    shieldMsg = `\n🔰 **Khiên bảo vệ (${user.buffs.shield * 100}%) đã giữ lại ${savedAmount.toLocaleString()} VND cho bạn!**`;
-                    user.buffs.shield = 0; // Xóa khiên sau khi dùng
+                // --- XỬ LÝ KHIÊN (🔰) ---
+                if (user.buffs?.shield > 0) {
+                    shieldSaved = Math.floor(game.totalReward * user.buffs.shield);
+                    user.money += shieldSaved;
+                    shieldInfo = `\n🔰 **KHIÊN BẢO VỆ:** Đã cứu lại **${shieldSaved.toLocaleString()} VND**!`;
+                    user.buffs.shield = 0; // Reset khiên
                     await user.save();
                 }
 
@@ -178,15 +178,19 @@ module.exports = {
                     .setTitle("💥 XẬP HẦM!!!")
                     .setDescription(
                         `💀 Bạn bị chôn vùi tại tầng: **${game.floor}**\n` +
+                        `💥 Tỉ lệ xập thực tế: **${crashChance.toFixed(1)}%**\n` +
                         `📈 ${getProgressBar(game.floor)}\n\n` +
-                        `🗑️ Mất quặng trị giá: **${lostReward.toLocaleString()} VND**` +
-                        luckMsg + shieldMsg
-                    );
+                        `💀 **MẤT TRẮNG VÉ: ${game.bet.toLocaleString("vi-VN")} VND**\n` +
+                        `🗑️ **MẤT QUẶNG: ${(game.totalReward - shieldSaved).toLocaleString("vi-VN")} VND**` +
+                        shieldInfo
+                    )
+                    .setThumbnail("https://i.imgur.com/vH9ZJsh.png");
 
                 games.delete(interaction.message.id);
                 return interaction.editReply({ embeds: [embed], components: [] });
             }
 
+            // NẾU KHÔNG XẬP -> TIẾP TỤC ĐÀO
             if (game.floor >= MAX_FLOOR) {
                 const jackpot = game.totalReward * 2;
                 user.money += jackpot;
@@ -195,26 +199,23 @@ module.exports = {
                 const embed = new EmbedBuilder()
                     .setColor(0xffd700)
                     .setTitle("👑 PHÁ ĐẢO HẦM MỎ!")
-                    .setDescription(
-                        `🎉 Bạn đã chạm đến Tầng Lõi **(${MAX_FLOOR}/${MAX_FLOOR})**!\n\n` +
-                        `🎁 **JACKPOT PHÁ ĐẢO x2**\n` +
-                        `💰 Tổng nhận: **${jackpot.toLocaleString()} VND**` + luckMsg
-                    );
+                    .setDescription(`🎉 Tầng Lõi **(${MAX_FLOOR}/${MAX_FLOOR})**!\n🎁 **JACKPOT x2:** **${jackpot.toLocaleString("vi-VN")} VND**`);
 
                 games.delete(interaction.message.id);
                 return interaction.editReply({ embeds: [embed], components: [] });
             }
+
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId("daoham_continue").setLabel("⛏️ ĐÀO TIẾP").setStyle(ButtonStyle.Success),
+                new ButtonBuilder().setCustomId("daoham_cashout").setLabel("💰 RÚT TIỀN").setStyle(ButtonStyle.Primary)
+            );
 
             const emptyChance = getEmptyChance(game.floor);
             if (Math.random() * 100 < emptyChance) {
                 const embed = new EmbedBuilder()
                     .setColor(getColorByFloor(game.floor))
                     .setTitle("⛏️ TẦNG RỖNG")
-                    .setDescription(
-                        `📍 Tầng: **${game.floor}** | 📈 ${getProgressBar(game.floor)}\n\n` +
-                        `💨 Tầng này không có quặng!` + luckMsg +
-                        `\n📦 Túi đồ: **${game.totalReward.toLocaleString()} VND**`
-                    );
+                    .setDescription(`📍 Tầng: **${game.floor}** | 💥 Nguy hiểm: **${crashChance.toFixed(1)}%**\n${buffInfo ? `✨ Buff: ${buffInfo}\n` : ""}📈 ${getProgressBar(game.floor)}\n\n💨 Tầng này không có quặng!`);
 
                 game.timeoutId = setTimeout(() => { games.delete(interaction.message.id); }, 60000);
                 game.isProcessing = false;
@@ -228,10 +229,12 @@ module.exports = {
                 .setColor(getColorByFloor(game.floor))
                 .setTitle("💎 ĐÀO THÀNH CÔNG!")
                 .setDescription(
-                    `📍 Tầng: **${game.floor}** | 📈 ${getProgressBar(game.floor)}\n\n` +
+                    `📍 Tầng: **${game.floor}** | 💥 Nguy hiểm: **${crashChance.toFixed(1)}%**\n` +
+                    `${buffInfo ? `✨ Buff: ${buffInfo}\n` : ""}` +
+                    `📈 ${getProgressBar(game.floor)}\n\n` +
                     `⛏️ Quặng: **${ore.name}** | ✨ Tinh khiết: **x${ore.multiplier}**\n` +
-                    `💵 Giá trị: **+${ore.value.toLocaleString()} VND**` + luckMsg +
-                    `\n\n📦 TỔNG TÚI ĐỒ: **${game.totalReward.toLocaleString()} VND**`
+                    `💵 Giá trị: **+${ore.value.toLocaleString("vi-VN")} VND**\n\n` +
+                    `📦 TỔNG TÚI ĐỒ: **${game.totalReward.toLocaleString("vi-VN")} VND**`
                 );
 
             game.timeoutId = setTimeout(() => { games.delete(interaction.message.id); }, 60000);
@@ -245,11 +248,8 @@ module.exports = {
 
             const embed = new EmbedBuilder()
                 .setColor(0x00ffcc)
-                .setTitle("跑🏃‍♂️ RÚT LUI AN TOÀN!")
-                .setDescription(
-                    `📍 Dừng lại tại tầng: **${game.floor}**\n\n` +
-                    `💵 **Tiền thu về:** **${game.totalReward.toLocaleString()} VND**`
-                );
+                .setTitle("🏃‍♂️ RÚT LUI AN TOÀN!")
+                .setDescription(`📍 Dừng lại tại tầng: **${game.floor}**\n💵 **Tiền thu về:** **${game.totalReward.toLocaleString("vi-VN")} VND**`);
 
             games.delete(interaction.message.id);
             return interaction.editReply({ embeds: [embed], components: [] });
