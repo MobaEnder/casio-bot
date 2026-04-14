@@ -8,9 +8,9 @@ const {
 const User = require("../models/User");
 
 const games = new Map();
-const abyssCooldowns = new Map(); // ⏳ Bộ nhớ tạm lưu cooldown Đáy Vực
+const abyssCooldowns = new Map();
 const ENTRY_FEE = 200000;
-const ABYSS_COOLDOWN_MS = 3 * 60 * 60 * 1000; // 3 tiếng tính bằng milliseconds
+const ABYSS_COOLDOWN_MS = 3 * 60 * 60 * 1000; 
 
 const FISH_DATA = {
     shallow: { 
@@ -64,17 +64,12 @@ const FISH_DATA = {
 };
 
 module.exports = {
-    data: new SlashCommandBuilder()
-        .setName("cauca")
-        .setDescription("🎣 Đi câu cá giải trí - Phí vào cổng 200k"),
+    data: new SlashCommandBuilder().setName("cauca").setDescription("🎣 Đi câu cá giải trí - Phí 200k"),
 
     async execute(interaction) {
         let user = await User.findOne({ userId: interaction.user.id });
         if (!user) user = await User.create({ userId: interaction.user.id });
-
-        if (user.money < ENTRY_FEE) {
-            return interaction.reply({ content: `❌ Bạn không đủ **${ENTRY_FEE.toLocaleString()} VND** để mua mồi câu!`, flags: 64 });
-        }
+        if (user.money < ENTRY_FEE) return interaction.reply({ content: `❌ Cần **${ENTRY_FEE.toLocaleString()} VND** để đi câu!`, flags: 64 });
 
         user.money -= ENTRY_FEE;
         await user.save();
@@ -82,13 +77,7 @@ module.exports = {
         const embed = new EmbedBuilder()
             .setColor(0x00AE86)
             .setTitle("🎣 CHUYẾN ĐI CÂU BẮT ĐẦU")
-            .setDescription("Hãy chọn vùng nước bạn muốn thả mồi. Vùng càng sâu, cá càng quý nhưng dây câu càng dễ đứt!")
-            .addFields(
-                { name: "🌊 Nước Nông", value: "An toàn", inline: true },
-                { name: "💧 Nước Vừa", value: "Rủi ro thấp", inline: true },
-                { name: "🟦 Nước Sâu", value: "Rủi ro cao", inline: true },
-                { name: "⬛ Đáy Vực", value: "1 con/3 tiếng", inline: true }
-            );
+            .setDescription("Hãy chọn vùng nước bạn muốn thả mồi.");
 
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId("cauca_select_shallow").setLabel("Nước Nông").setStyle(ButtonStyle.Success),
@@ -97,94 +86,87 @@ module.exports = {
             new ButtonBuilder().setCustomId("cauca_select_abyss").setLabel("Đáy Vực").setStyle(ButtonStyle.Danger)
         );
 
-        const response = await interaction.reply({ embeds: [embed], components: [row], withResponse: true });
-        const msg = response.resource.message;
-
-        games.set(msg.id, {
-            userId: interaction.user.id,
-            zone: null,
-            basket: [],
-            totalValue: 0,
-            fishCount: 0
-        });
+        const response = await interaction.reply({ embeds: [embed], components: [row], fetchReply: true });
+        games.set(response.id, { userId: interaction.user.id, zone: null, totalValue: 0, fishCount: 0 });
     },
 
     async handleButton(interaction) {
         const game = games.get(interaction.message.id);
-        if (!game || interaction.user.id !== game.userId) {
-            return interaction.reply({ content: "❌ Phiên này không thuộc về bạn!", flags: 64 });
-        }
+        if (!game || interaction.user.id !== game.userId) return interaction.reply({ content: "❌ Không phải phiên của bạn!", flags: 64 });
 
-        const parts = interaction.customId.split("_");
-        const action = parts[1]; 
-        const value = parts[2];  
+        const [ , action, value] = interaction.customId.split("_");
+        let user = await User.findOne({ userId: interaction.user.id });
 
         // 1. CHỌN VÙNG NƯỚC
         if (action === "select") {
             if (value === "abyss") {
                 const lastTime = abyssCooldowns.get(interaction.user.id) || 0;
-                const now = Date.now();
-
-                if (now < lastTime + ABYSS_COOLDOWN_MS) {
-                    const timeLeft = lastTime + ABYSS_COOLDOWN_MS - now;
-                    const hours = Math.floor(timeLeft / (1000 * 60 * 60));
-                    const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
-                    
-                    // Dùng followUp hoặc reply nhưng KHÔNG cập nhật giao diện game
-                    return interaction.reply({ 
-                        content: `🌪️ Đáy Vực đang động! Hãy quay lại sau **${hours} giờ ${minutes} phút**.`, 
-                        flags: 64 
-                    });
+                if (Date.now() < lastTime + ABYSS_COOLDOWN_MS) {
+                    const timeLeft = lastTime + ABYSS_COOLDOWN_MS - Date.now();
+                    return interaction.reply({ content: `🌪️ Đáy Vực đang động! Còn **${Math.floor(timeLeft / 3600000)}h ${Math.floor((timeLeft % 3600000) / 60000)}p**.`, flags: 64 });
                 }
-                // CHỈ KHI HẾT COOLDOWN MỚI SET THỜI GIAN MỚI
-                abyssCooldowns.set(interaction.user.id, now);
+                abyssCooldowns.set(interaction.user.id, Date.now());
             }
-
             game.zone = value;
-            // Cập nhật giao diện sang màn hình câu cá
             return updateGameUI(interaction, game);
         }
-        
-        // 2. CÂU TIẾP
+
+        // 2. QUĂNG MỒI
         if (action === "cast") {
             const zoneData = FISH_DATA[game.zone];
-            const breakChance = zoneData.breakBase + (game.fishCount * 2); 
+            let breakChance = zoneData.breakBase + (game.fishCount * 4);
+            let luckMsg = "";
+
+            // --- DÙNG BÙA LUCK ---
+            if (user.buffs.winRateBoost > 0) {
+                const reduction = breakChance * user.buffs.winRateBoost;
+                breakChance -= reduction;
+                luckMsg = `\n*(🍀 Đã dùng Bùa Luck: -${user.buffs.winRateBoost * 100}% tỉ lệ đứt)*`;
+                user.buffs.winRateBoost = 0;
+                await user.save();
+            }
 
             if (Math.random() * 100 < breakChance) {
+                let shieldMsg = "";
+                let lostValue = game.totalValue;
+
+                // --- DÙNG KHIÊN BẢO VỆ ---
+                if (user.buffs.shield > 0) {
+                    const saved = Math.floor(game.totalValue * user.buffs.shield);
+                    user.money += saved;
+                    lostValue -= saved;
+                    shieldMsg = `\n🔰 **Khiên bảo vệ đã giữ lại ${saved.toLocaleString()} VND!**`;
+                    user.buffs.shield = 0;
+                    await user.save();
+                }
+
                 const embed = new EmbedBuilder()
                     .setColor(0xff0000)
                     .setTitle("💥 ĐỨT DÂY CÂU!!!")
-                    .setDescription(`💔 Ôi không! Một con cá quá lớn đã kéo đứt dây câu của bạn tại **${zoneData.name}**.\n\n` +
-                                    `🗑️ Bạn đã mất trắng **${game.totalValue.toLocaleString()} VND**!`);
+                    .setDescription(`Dây câu bị đứt tại **${zoneData.name}**! Mất trắng **${lostValue.toLocaleString()} VND** cá.` + luckMsg + shieldMsg);
                 
                 games.delete(interaction.message.id);
                 return interaction.update({ embeds: [embed], components: [] });
             }
 
-            const fishList = zoneData.fish;
-            const caught = fishList[Math.floor(Math.random() * fishList.length)];
+            // TÍNH TOÁN CÁ CÂU ĐƯỢC
+            const caught = zoneData.fish[Math.floor(Math.random() * zoneData.fish.length)];
             const fishVal = Math.floor(Math.random() * (caught.max - caught.min + 1)) + caught.min;
-
-            game.basket.push(caught.name);
-            game.totalValue += fishVal;
+            
             game.fishCount++;
+            game.totalValue += fishVal;
 
-            return updateGameUI(interaction, game, `✨ Bạn vừa câu được: **${caught.name}** (+${fishVal.toLocaleString()} VND)`);
+            return updateGameUI(interaction, game, `✨ Bạn vừa câu được: **${caught.name}** (+${fishVal.toLocaleString()} VND)${luckMsg}`);
         }
 
         // 3. THU LƯỚI
         if (action === "collect") {
-            let user = await User.findOne({ userId: interaction.user.id });
             user.money += game.totalValue;
             await user.save();
-
             const embed = new EmbedBuilder()
                 .setColor(0xffcc00)
                 .setTitle("🚢 THU LƯỚI TRỞ VỀ")
-                .setDescription(`Bạn đã kết thúc chuyến câu tại **${FISH_DATA[game.zone].name}**.\n\n` +
-                                `🎒 Tổng số cá: **${game.fishCount} con**\n` +
-                                `💰 Tổng tiền thu về: **${game.totalValue.toLocaleString()} VND**`);
-
+                .setDescription(`💰 Tổng tiền thu về: **${game.totalValue.toLocaleString()} VND**`);
             games.delete(interaction.message.id);
             return interaction.update({ embeds: [embed], components: [] });
         }
@@ -194,32 +176,16 @@ module.exports = {
 async function updateGameUI(interaction, game, lastActionMsg = "") {
     const zoneData = FISH_DATA[game.zone];
     const breakChance = zoneData.breakBase + (game.fishCount * 4);
-    
-    // 🛑 Kiểm tra xem người chơi có đang ở Đáy vực và đã câu được cá chưa
     const isAbyssMaxed = game.zone === "abyss" && game.fishCount >= 1;
 
     const embed = new EmbedBuilder()
         .setColor(zoneData.color)
         .setTitle(`🎣 ĐANG CÂU TẠI: ${zoneData.name.toUpperCase()}`)
-        .setDescription(
-            `${lastActionMsg ? lastActionMsg + "\n\n" : ""}` +
-            `🛒 Giỏ cá: **${game.fishCount}** con ${isAbyssMaxed ? "(Đã đầy)" : ""}\n` +
-            `💰 Tổng trị giá: **${game.totalValue.toLocaleString()} VND**\n` +
-            `⚠️ Tỉ lệ đứt dây tiếp theo: **${breakChance.toFixed(0)}%**`
-        );
+        .setDescription(`${lastActionMsg ? lastActionMsg + "\n\n" : ""}🛒 Giỏ cá: **${game.fishCount}** con\n💰 Trị giá: **${game.totalValue.toLocaleString()} VND**\n⚠️ Tỉ lệ đứt tiếp: **${breakChance.toFixed(0)}%**`);
 
     const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId("cauca_cast_action")
-            .setLabel(isAbyssMaxed ? "🔒 KHÔNG THỂ CÂU THÊM" : "🎣 QUĂNG MỒI TIẾP")
-            .setStyle(isAbyssMaxed ? ButtonStyle.Secondary : ButtonStyle.Success)
-            .setDisabled(isAbyssMaxed), // Khóa nút nếu ở đáy vực và đã có 1 con
-        new ButtonBuilder()
-            .setCustomId("cauca_collect_action")
-            .setLabel("🚢 THU LƯỚI VỀ")
-            .setStyle(ButtonStyle.Primary)
-            .setDisabled(game.fishCount === 0)
+        new ButtonBuilder().setCustomId("cauca_cast_action").setLabel(isAbyssMaxed ? "🔒 GIỎ ĐẦY" : "🎣 QUĂNG MỒI").setStyle(isAbyssMaxed ? ButtonStyle.Secondary : ButtonStyle.Success).setDisabled(isAbyssMaxed),
+        new ButtonBuilder().setCustomId("cauca_collect_action").setLabel("🚢 THU LƯỚI").setStyle(ButtonStyle.Primary).setDisabled(game.fishCount === 0)
     );
-
     return interaction.update({ embeds: [embed], components: [row] });
 }

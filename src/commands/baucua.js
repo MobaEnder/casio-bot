@@ -107,29 +107,49 @@ module.exports = {
             let losers = [];
 
             // Xử lý kết quả trả thưởng
-            for (const [userId, bet] of game.bets.entries()) {
-                let uData = await User.findOne({ userId });
-                if (!uData) continue;
+            // Tìm đoạn: for (const [userId, bet] of game.bets.entries()) { ... }
 
-                const hit = counts[bet.face] || 0;
+for (const [userId, bet] of game.bets.entries()) {
+    const uData = await User.findOne({ userId });
+    if (!uData) continue;
 
-                if (hit > 0) {
-                    // Đã trừ tiền lúc cược. Thắng thì trả lại: Gốc + (Gốc * số mặt trúng)
-                    const winAmount = bet.amount * (hit + 1); 
-                    const pureProfit = bet.amount * hit; // Tiền lãi thật sự để hiển thị
+    let usedBuffs = []; // Để lưu thông báo bùa đã dùng
 
-                    uData.money += winAmount;
-                    uData.stats.win++;
-                    winners.push(`✅ <@${userId}> (+\`${pureProfit.toLocaleString()}\`) [${EMOJIS[bet.face]} x${hit}]`);
-                } else {
-                    // Không cần trừ tiền nữa vì đã trừ ở Modal
-                    uData.stats.lose++;
-                    losers.push(`❌ <@${userId}> (-\`${bet.amount.toLocaleString()}\`) [${EMOJIS[bet.face]}]`);
-                }
+    if (bet.choice === result) {
+        // --- XỬ LÝ LUCK ---
+        if (uData.buffs.winRateBoost > 0) {
+            usedBuffs.push(`🍀 Bùa Luck (${uData.buffs.winRateBoost * 100}%)`);
+            uData.buffs.winRateBoost = 0; // Xóa bùa
+        }
 
-                uData.stats.gamblePlayed++;
-                await uData.save();
-            }
+        const winAmt = bet.amount * 2;
+        uData.money += winAmt;
+        uData.stats.win++;
+        winners.push(`<@${userId}> (+\`${bet.amount.toLocaleString()}\`)${usedBuffs.length ? " [" + usedBuffs.join(", ") + "]" : ""}`);
+    } else {
+        // --- XỬ LÝ SHIELD ---
+        let lossAmount = bet.amount;
+        if (uData.buffs.shield > 0) {
+            const reducedLoss = bet.amount * (1 - uData.buffs.shield);
+            const savedAmount = bet.amount - reducedLoss;
+            uData.money += Math.floor(savedAmount); // Trả lại phần tiền được khiên bảo vệ
+            lossAmount = Math.floor(reducedLoss);
+            usedBuffs.push(`🔰 Khiên (${uData.buffs.shield * 100}%)`);
+            uData.buffs.shield = 0; // Xóa khiên
+        }
+
+        // Nếu có bùa luck mà thua thì vẫn mất bùa
+        if (uData.buffs.winRateBoost > 0) {
+            usedBuffs.push(`🍀 Bùa Luck (${uData.buffs.winRateBoost * 100}%)`);
+            uData.buffs.winRateBoost = 0;
+        }
+
+        uData.stats.lose++;
+        losers.push(`<@${userId}> (-\`${lossAmount.toLocaleString()}\`)${usedBuffs.length ? " [" + usedBuffs.join(", ") + "]" : ""}`);
+    }
+    uData.stats.gamblePlayed++;
+    await uData.save();
+}
 
             const resultEmbed = new EmbedBuilder()
                 .setColor(0x00ff99)
