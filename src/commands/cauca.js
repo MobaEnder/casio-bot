@@ -54,7 +54,7 @@ const FISH_DATA = {
         color: 0x1a1a1a, 
         breakBase: 70, 
         fish: [ 
-            { name: "🐉 Long Ngư", min: 100000, max: 1200000 }, 
+            { name: "🐉 Long Ngư", min: 1000000, max: 1200000 }, 
             { name: "🐙 Quái Vật Kraken", min: 1200000, max: 1500000 }, 
             { name: "💎 Cá Pha Lê", min: 1500000, max: 2000000 }, 
             { name: "🔱 Quy Thần Đáy Biển", min: 2500000, max: 3000000 }, 
