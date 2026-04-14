@@ -26,19 +26,30 @@ const FACES = Object.keys(EMOJIS);
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("baucua")
-        .setDescription("🎲 Tạo sòng Bầu Cua - Tỉ lệ 50/50 hên xui!"),
+        .setDescription("🎲 Sòng Bầu Cua Quý Tộc - Giao diện VIP & Tỉ lệ 50/50"),
 
     async execute(interaction) {
-        const user = await User.findOne({ userId: interaction.user.id });
-        if (user?.banned) {
-            return interaction.reply({ content: "⛔ Bạn đã bị cấm cược!", flags: 64 });
+        let user = await User.findOne({ userId: interaction.user.id });
+        if (!user) user = await User.create({ userId: interaction.user.id });
+
+        if (user.banned) {
+            return interaction.reply({
+                content: "⛔ Bạn đã bị cấm khỏi sòng bài do vi phạm chính sách!",
+                flags: 64,
+            });
         }
 
         const embed = new EmbedBuilder()
-            .setColor(0xff8800)
-            .setTitle("🎲 SÒNG BẦU CUA ĐANG MỞ")
-            .setDescription("👉 Chọn linh vật để đặt cược!\n⏳ Nhà cái sẽ xóc sau **30 giây**...")
-            .setFooter({ text: "Nhà cái uy tín 50/50 💎" });
+            .setColor(0xffd700)
+            .setTitle("🌟 SÒNG BẦU CUA THƯỢNG LƯU 🌟")
+            .setDescription(
+                "```fix\n💎 CHÀO MỪNG CÁC ĐẠI GIA ĐẾN VỚI CASINO 💎\n```\n" +
+                "👉 **Luật chơi:** Chọn linh vật để đặt cược. Ăn gấp đôi nếu trúng 1 mặt, gấp ba nếu trúng 2 mặt!\n\n" +
+                "⏳ Nhà cái sẽ xóc sau **30 giây**..."
+            )
+            .setThumbnail("https://i.imgur.com/83p1f8Z.png") // Link ảnh bầu cua nếu có
+            .setFooter({ text: "💰 Chúc các đại gia hên xui may mắn!" })
+            .setTimestamp();
 
         const row1 = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId("baucua_nai").setLabel("🦌 Nai").setStyle(ButtonStyle.Primary),
@@ -52,13 +63,18 @@ module.exports = {
             new ButtonBuilder().setCustomId("baucua_tom").setLabel("🦐 Tôm").setStyle(ButtonStyle.Success)
         );
 
-        const msg = await interaction.reply({ embeds: [embed], components: [row1, row2], fetchReply: true });
+        const msg = await interaction.reply({
+            embeds: [embed],
+            components: [row1, row2],
+            fetchReply: true,
+        });
 
         games.set(msg.id, {
             bets: new Map(), // userId -> { face, amount }
             endsAt: Date.now() + 30000,
         });
 
+        // ⏳ Xử lý sau 30 giây
         setTimeout(async () => {
             const game = games.get(msg.id);
             if (!game) return;
@@ -66,16 +82,16 @@ module.exports = {
             let rolls = [];
             const betFaces = Array.from(new Set(Array.from(game.bets.values()).map(b => b.face)));
 
-            // 🎲 LOGIC 50/50 CỦA BẠN
+            // 🎲 LOGIC 50/50 VIP
             if (betFaces.length === 0) {
                 rolls = Array.from({ length: 3 }, () => FACES[Math.floor(Math.random() * FACES.length)]);
             } else {
-                const isWin = Math.random() < 0.50;
+                const isWin = Math.random() < 0.50; // 50% thắng hoặc thua
                 if (isWin) {
                     const winningFace = betFaces[Math.floor(Math.random() * betFaces.length)];
                     rolls.push(winningFace); 
-                    rolls.push(FACES[Math.floor(Math.random() * FACES.length)]);
-                    rolls.push(FACES[Math.floor(Math.random() * FACES.length)]);
+                    rolls.push(FACES[Math.floor(Math.random() * 6)]);
+                    rolls.push(FACES[Math.floor(Math.random() * 6)]);
                 } else {
                     const loseFaces = FACES.filter(f => !betFaces.includes(f));
                     rolls = Array.from({ length: 3 }, () => loseFaces[Math.floor(Math.random() * loseFaces.length)]);
@@ -94,20 +110,19 @@ module.exports = {
                 const matchCount = rolls.filter(r => r === bet.face).length;
 
                 if (matchCount > 0) {
-                    // --- THẮNG ---
+                    // --- LOGIC THẮNG ---
                     if (uData.buffs.winRateBoost > 0) {
                         usedBuffs.push(`🍀 Luck ${uData.buffs.winRateBoost * 100}%`);
-                        uData.buffs.winRateBoost = 0;
+                        uData.buffs.winRateBoost = 0; // Dùng là mất
                     }
-                    // Trả tiền gốc + tiền lời (Lời = gốc * số mặt trùng)
                     const profit = bet.amount * matchCount;
                     const totalReturn = bet.amount + profit;
                     
                     uData.money += totalReturn;
                     uData.stats.win++;
-                    winners.push(`<@${userId}> +**${profit.toLocaleString()}**${usedBuffs.length ? ` [${usedBuffs.join(", ")}]` : ""}`);
+                    winners.push(`✅ <@${userId}> +**${profit.toLocaleString()}** (Trúng ${matchCount}x ${EMOJIS[bet.face]})${usedBuffs.length ? ` [${usedBuffs.join(", ")}]` : ""}`);
                 } else {
-                    // --- THUA ---
+                    // --- LOGIC THUA ---
                     let lostAmt = bet.amount;
                     if (uData.buffs.shield > 0) {
                         const refund = Math.floor(bet.amount * uData.buffs.shield);
@@ -121,53 +136,13 @@ module.exports = {
                         uData.buffs.winRateBoost = 0;
                     }
                     uData.stats.lose++;
-                    losers.push(`<@${userId}> -**${lostAmt.toLocaleString()}**${usedBuffs.length ? ` [${usedBuffs.join(", ")}]` : ""}`);
+                    losers.push(`❌ <@${userId}> -**${lostAmt.toLocaleString()}** (${EMOJIS[bet.face]})${usedBuffs.length ? ` [${usedBuffs.join(", ")}]` : ""}`);
                 }
                 uData.stats.gamblePlayed++;
                 await uData.save();
             }
 
             const resultEmbed = new EmbedBuilder()
-                .setColor(0x00ff99)
-                .setTitle("🎉 KẾT QUẢ BẦU CUA")
-                .setDescription(
-                    `🎲 Xúc xắc: **${rolls.map(r => EMOJIS[r]).join(" ")}**\n\n` +
-                    `🏆 **Người thắng:**\n${winners.join("\n") || "Nhà cái ăn hết!"}\n\n` +
-                    `💀 **Người thua:**\n${losers.join("\n") || "Không ai thua!"}`
-                );
-
-            await msg.edit({ embeds: [resultEmbed], components: [] });
-            games.delete(msg.id);
-        }, 30000);
-    },
-
-    async handleButton(interaction) {
-        const game = games.get(interaction.message.id);
-        if (!game) return interaction.reply({ content: "❌ Bàn đã đóng!", flags: 64 });
-        if (game.bets.has(interaction.user.id)) return interaction.reply({ content: "❌ Bạn đã cược rồi!", flags: 64 });
-
-        const face = interaction.customId.split("_")[1];
-        const modal = new ModalBuilder().setCustomId(`baucua_modal_${face}`).setTitle(`Cược vào ${face.toUpperCase()}`);
-        const input = new TextInputBuilder().setCustomId("bet_amount").setLabel("Số tiền cược").setStyle(TextInputStyle.Short).setRequired(true);
-        modal.addComponents(new ActionRowBuilder().addComponents(input));
-        await interaction.showModal(modal);
-    },
-
-    async handleModal(interaction) {
-        const face = interaction.customId.split("_")[2];
-        const amount = parseInt(interaction.fields.getTextInputValue("bet_amount"));
-        const game = games.get(interaction.message.id);
-
-        if (!game) return interaction.reply({ content: "❌ Hết thời gian cược!", flags: 64 });
-        if (isNaN(amount) || amount < 1000) return interaction.reply({ content: "❌ Tiền cược không hợp lệ!", flags: 64 });
-
-        let user = await User.findOne({ userId: interaction.user.id });
-        if (user.money < amount) return interaction.reply({ content: "❌ Bạn không đủ tiền!", flags: 64 });
-
-        user.money -= amount;
-        await user.save();
-        game.bets.set(interaction.user.id, { face, amount });
-
-        await interaction.reply({ content: `✅ Đã cược **${amount.toLocaleString()} VND** vào **${EMOJIS[face]} ${face.toUpperCase()}**`, flags: 64 });
-    }
-};
+                .setColor(0xffd700)
+                .setTitle("🎉 KẾT QU
+ 
