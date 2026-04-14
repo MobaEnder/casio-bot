@@ -12,7 +12,7 @@ const User = require("../models/User");
 
 const PRICE_PER_BAG = 100000;
 const MAX_BAGS = 100;
-const WIN_PERCENT = 35; // Tăng lên 35% để dễ thở hơn
+const WIN_PERCENT = 40; // Tăng lên 40% để dễ thở hơn
 
 const games = new Map();
 
