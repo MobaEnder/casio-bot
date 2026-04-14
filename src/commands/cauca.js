@@ -28,7 +28,7 @@ const FISH_DATA = {
     mid: { 
         name: "Nước Vừa", 
         color: 0x00a8ff, 
-        breakBase: 8, 
+        breakBase: 5, 
         fish: [ 
             { name: "🐟 Cá Chép", min: 30000, max: 35000 }, 
             { name: "🐠 Cá Tai Tượng", min: 40000, max: 45000 }, 
@@ -40,7 +40,7 @@ const FISH_DATA = {
     deep: { 
         name: "Nước Sâu", 
         color: 0x00416a, 
-        breakBase: 12, 
+        breakBase: 10, 
         fish: [ 
             { name: "🦈 Cá Mập Con", min: 70000, max: 75000 }, 
             { name: "🐟 Cá Ngừ Đại Dương", min: 80000, max: 85000 }, 
@@ -52,7 +52,7 @@ const FISH_DATA = {
     abyss: { 
         name: "Đáy Vực", 
         color: 0x1a1a1a, 
-        breakBase: 30, 
+        breakBase: 70, 
         fish: [ 
             { name: "🐉 Long Ngư", min: 100000, max: 1200000 }, 
             { name: "🐙 Quái Vật Kraken", min: 1200000, max: 1500000 }, 
@@ -148,7 +148,7 @@ module.exports = {
         // 2. CÂU TIẾP
         if (action === "cast") {
             const zoneData = FISH_DATA[game.zone];
-            const breakChance = zoneData.breakBase + (game.fishCount * 4); 
+            const breakChance = zoneData.breakBase + (game.fishCount * 2); 
 
             if (Math.random() * 100 < breakChance) {
                 const embed = new EmbedBuilder()
