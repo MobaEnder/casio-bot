@@ -65,13 +65,20 @@ const rest = new REST({ version: "10" }).setToken(TOKEN);
 // ===== INTERACTION HANDLER =====
 client.on(Events.InteractionCreate, async interaction => {
   try {
-    // 1. KIỂM TRA BAN TOÀN CẦU
-    const userDB = await User.findOne({ userId: interaction.user.id });
-    if (userDB && userDB.banned) {
-        return interaction.reply({ 
-            content: "🚫 Tài khoản của bạn đã bị BAN vĩnh viễn do vi phạm hoặc trốn nợ!", 
-            flags: 64 
-        });
+    // 1. ĐẶC CÁCH: Kiểm tra nếu là lệnh /anxa hoặc là Admin thì bỏ qua check Ban
+    const adminIds = process.env.ADMIN_IDS ? process.env.ADMIN_IDS.split(",") : [];
+    const isAnxaCommand = interaction.isChatInputCommand() && interaction.commandName === "anxa";
+    const isAdmin = adminIds.includes(interaction.user.id);
+
+    // Nếu KHÔNG PHẢI lệnh anxa VÀ KHÔNG PHẢI admin thì mới check Ban
+    if (!isAnxaCommand && !isAdmin) {
+        const userDB = await User.findOne({ userId: interaction.user.id });
+        if (userDB && userDB.banned) {
+            return interaction.reply({ 
+                content: "🚫 Tài khoản của bạn đã bị BAN vĩnh viễn do vi phạm hoặc trốn nợ!", 
+                flags: 64 
+            });
+        }
     }
 
     // 2. XỬ LÝ SLASH COMMANDS
@@ -79,10 +86,14 @@ client.on(Events.InteractionCreate, async interaction => {
       const command = client.commands.get(interaction.commandName);
       if (!command) return;
 
-      const cooldown = checkCooldown(interaction.user.id, interaction.commandName);
-      if (cooldown) {
-        return interaction.reply({ content: `⏳ Chờ **${cooldown}** nữa để dùng lại **/${interaction.commandName}**`, flags: 64 });
+      // Check Cooldown (Cũng nên cho Admin vượt Cooldown nếu muốn)
+      if (!isAdmin) {
+          const cooldown = checkCooldown(interaction.user.id, interaction.commandName);
+          if (cooldown) {
+            return interaction.reply({ content: `⏳ Chờ **${cooldown}** nữa để dùng lại **/${interaction.commandName}**`, flags: 64 });
+          }
       }
+      
       return await command.execute(interaction);
     }
 
