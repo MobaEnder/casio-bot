@@ -1,44 +1,78 @@
 const User = require("../models/User");
-const { EmbedBuilder } = require("discord.js");
 
 module.exports = async function checkLoans(client) {
     try {
         // Tìm những người có nợ đã quá hạn
         const overdue = await User.find({
             "loan.active": true,
-            "loan.dueAt": { $lt: new Date() }, // Lưu ý: Đổi thành Date.now() nếu bạn dùng Timestamp
+            "loan.dueAt": { $lt: new Date() },
         });
 
-        if (overdue.length === 0) return; // Không có ai quá hạn thì dừng luôn cho nhẹ máy
+        if (overdue.length === 0) return;
 
         for (const user of overdue) {
             try {
                 const lenderId = user.loan.from;
-                const amount = user.loan.amount;
-
-                // Reset nợ và Ban
-                user.loan.active = false;
-                user.loan.amount = 0;
-                user.loan.from = null;
-                user.loan.dueAt = null;
-                user.banned = true; 
+                const debtAmount = user.loan.amount;
                 
-                // Chuyển save() vào trong try để an toàn
-                await user.save(); 
+                // 1. Tính tổng tài sản của con nợ
+                const totalAssets = (user.money || 0) + (user.bank || 0);
 
-                const discordUser = await client.users.fetch(user.userId).catch(() => null);
-                if (discordUser) {
-                    await discordUser.send("💀 **HẾT THỜI RỒI!** Bạn đã quá hạn trả nợ và chính thức bị **BAN** khỏi hệ thống cược vĩnh viễn.").catch(() => {});
-                }
+                let userUpdate = await User.findOne({ userId: user.userId });
+                let lenderUpdate = await User.findOne({ userId: lenderId });
 
-                if (lenderId) {
-                    const lender = await client.users.fetch(lenderId).catch(() => null);
-                    if (lender) {
-                        await lender.send(`📢 Chia buồn! Con nợ <@${user.userId}> đã trốn nợ quá hạn. Hắn đã bị ban, nhưng số tiền **${amount.toLocaleString()} VND** của bạn đã bay theo gió...`).catch(() => {});
+                // TRƯỜNG HỢP 1: CON NỢ CÓ ĐỦ TIỀN ĐỂ TRẢ (TÍNH CẢ TRONG NGÂN HÀNG)
+                if (totalAssets >= debtAmount) {
+                    let remainingDebt = debtAmount;
+
+                    // Ưu tiên trừ tiền mặt trước
+                    if (userUpdate.money >= remainingDebt) {
+                        userUpdate.money -= remainingDebt;
+                        remainingDebt = 0;
+                    } else {
+                        remainingDebt -= userUpdate.money;
+                        userUpdate.money = 0;
+                        // Trừ phần còn lại vào ngân hàng
+                        userUpdate.bank -= remainingDebt;
+                    }
+
+                    // Trả tiền cho chủ nợ
+                    if (lenderUpdate) {
+                        lenderUpdate.money += debtAmount;
+                        await lenderUpdate.save();
+                    }
+
+                    // Reset trạng thái nợ nhưng KHÔNG BAN
+                    userUpdate.loan.active = false;
+                    userUpdate.loan.amount = 0;
+                    userUpdate.loan.from = null;
+                    userUpdate.loan.dueAt = null;
+                    await userUpdate.save();
+
+                    // Thông báo thu hồi nợ thành công
+                    const channel = await client.channels.fetch("1492024555168989235").catch(() => null);
+                    if (channel) {
+                        channel.send(`🔔 **THU HỒI NỢ TỰ ĐỘNG**\n> 👤 Con nợ: <@${user.userId}>\n> 💰 Chủ nợ: <@${lenderId}>\n> 💸 Số tiền: **${debtAmount.toLocaleString()} VND**\n*Hệ thống đã tự động trừ tiền từ tài khoản/ngân hàng để hoàn tất khoản vay.*`);
+                    }
+                } 
+                
+                // TRƯỜNG HỢP 2: KHÔNG ĐỦ TIỀN TRẢ -> BAN
+                else {
+                    userUpdate.loan.active = false;
+                    userUpdate.loan.amount = 0;
+                    userUpdate.loan.from = null;
+                    userUpdate.loan.dueAt = null;
+                    userUpdate.banned = true; 
+                    await userUpdate.save();
+
+                    // Thông báo Ban
+                    const channel = await client.channels.fetch("1492024555168989235").catch(() => null);
+                    if (channel) {
+                        channel.send(`💀 **SIẾT NỢ THẤT BẠI**\n> ❌ Con nợ <@${user.userId}> không đủ tiền trả cho <@${lenderId}> (Số nợ: ${debtAmount.toLocaleString()} VND).\n> 🔨 Hình phạt: **BAN VĨNH VIỄN**.`);
                     }
                 }
             } catch (err) {
-                console.log(`Lỗi khi xử lý ban nợ cho user ${user.userId}:`, err);
+                console.log(`Lỗi khi xử lý nợ cho user ${user.userId}:`, err);
             }
         }
     } catch (dbError) {
