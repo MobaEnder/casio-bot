@@ -17,11 +17,9 @@ module.exports = {
         .addIntegerOption(opt =>
             opt.setName("sotien").setDescription("Số tiền muốn vay").setRequired(true)
         )
-        .addIntegerOption(opt =>
+        .addStringOption(opt =>
             opt.setName("thoihan")
-                .setDescription("Thời hạn trả (1 - 24 giờ)")
-                .setMinValue(1)
-                .setMaxValue(24)
+                .setDescription("Thời hạn trả (Ví dụ: 30m, 2h, 24h)")
                 .setRequired(true)
         ),
 
@@ -29,7 +27,34 @@ module.exports = {
         const borrower = interaction.user;
         const lender = interaction.options.getUser("nguoi");
         const amount = interaction.options.getInteger("sotien");
-        const hours = interaction.options.getInteger("thoihan");
+        const timeInput = interaction.options.getString("thoihan").toLowerCase();
+
+        // --- LOGIC XỬ LÝ THỜI GIAN ---
+        const timeRegex = /^(\d+)(m|h)$/;
+        const match = timeInput.match(timeRegex);
+
+        if (!match) {
+            return interaction.reply({ 
+                content: "❌ Định dạng thời gian sai! Sử dụng `1m-60m` (phút) hoặc `1h-24h` (giờ). Ví dụ: `30m` hoặc `2h`.", 
+                flags: 64 
+            });
+        }
+
+        const value = parseInt(match[1]);
+        const unit = match[2];
+        let durationMs = 0;
+        let displayTime = "";
+
+        if (unit === "m") {
+            if (value < 1 || value > 60) return interaction.reply({ content: "❌ Thời hạn phút phải từ `1m` đến `60m`.", flags: 64 });
+            durationMs = value * 60 * 1000;
+            displayTime = `${value} phút`;
+        } else if (unit === "h") {
+            if (value < 1 || value > 24) return interaction.reply({ content: "❌ Thời hạn giờ phải từ `1h` đến `24h`.", flags: 64 });
+            durationMs = value * 60 * 60 * 1000;
+            displayTime = `${value} giờ`;
+        }
+        // -----------------------------
 
         if (lender.id === borrower.id)
             return interaction.reply({ content: "❌ Bạn định lấy tiền túi trái bỏ vào túi phải à? Không vay chính mình nhé!", flags: 64 });
@@ -63,7 +88,7 @@ module.exports = {
             });
         }
 
-        const dueAt = new Date(Date.now() + hours * 60 * 60 * 1000);
+        const dueAt = new Date(Date.now() + durationMs);
 
         const embed = new EmbedBuilder()
             .setColor("Gold")
@@ -73,14 +98,13 @@ module.exports = {
                 `👤 **Bên vay:** ${borrower}\n` +
                 `🏦 **Bên cho vay:** ${lender}\n` +
                 `💰 **Số tiền vay:** \`${amount.toLocaleString()} VND\`\n` +
-                `⏳ **Thời hạn trả:** \`${hours} giờ\`\n\n` +
+                `⏳ **Thời hạn trả:** \`${displayTime}\`\n\n` +
                 `⚠️ **ĐIỀU KHOẢN:**\n` +
-                `*Nếu không trả trước <t:${Math.floor(dueAt.getTime() / 1000)}:f>, bên vay sẽ bị **CẤM VĨNH VIỄN** khỏi Casino và tất cả tài sản sẽ bị phong tỏa.*`
+                `*Nếu không trả trước <t:${Math.floor(dueAt.getTime() / 1000)}:f>, hệ thống sẽ tự động quét ngân hàng/ví để trừ nợ. Nếu cháy túi, bạn sẽ bị **BAN VĨNH VIỄN**.*`
             )
             .setFooter({ text: "Nhấn nút dưới đây để ký tên xác nhận" })
             .setTimestamp();
 
-        // ĐÃ SỬA: Đổi dấu ":" thành dấu "_"
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`vaytien_accept_${borrower.id}_${lender.id}_${amount}_${dueAt.getTime()}`)
@@ -100,9 +124,7 @@ module.exports = {
         });
     },
 
-    // ================= XỬ LÝ NÚT BẤM =================
     async handleButton(interaction) {
-        // ĐÃ SỬA: Split bằng dấu "_"
         const [cmd, action, borrowerId, lenderId, amount, dueAt] = interaction.customId.split("_");
         if (cmd !== "vaytien") return;
 
@@ -119,13 +141,11 @@ module.exports = {
 
         if (action === "accept") {
             const amt = Number(amount);
-            if (lender.money < amt) return interaction.reply({ content: "❌ Tiền trong ví bạn vừa bốc hơi rồi, không đủ cho vay nữa!", flags: 64 });
+            if (!lender || lender.money < amt) return interaction.reply({ content: "❌ Tiền trong ví bạn vừa bốc hơi rồi, không đủ cho vay nữa!", flags: 64 });
 
-            // Trừ tiền người cho vay
             lender.money -= amt;
             await lender.save();
 
-            // Cộng tiền người vay + khởi tạo nợ
             borrower.money += amt;
             borrower.loan = {
                 active: true,
