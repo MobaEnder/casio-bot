@@ -184,7 +184,7 @@ module.exports = {
                         `🗑️ **MẤT QUẶNG: ${(game.totalReward - shieldSaved).toLocaleString("vi-VN")} VND**` +
                         shieldInfo
                     )
-                    .setThumbnail("https://i.imgur.com/vH9ZJsh.png");
+                    .setThumbnail("https://images.spiderum.com/sp-images/17eb0e60583e11ec97b1ed671895b6f8.png");
 
                 games.delete(interaction.message.id);
                 return interaction.editReply({ embeds: [embed], components: [] });

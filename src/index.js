@@ -11,6 +11,13 @@ const path = require("path");
 require("dotenv").config();
 const connectDB = require("./database/mongo");
 const { checkCooldown } = require("./utils/cooldowns");
+
+// BỔ SUNG 1: Import Model User để check Ban
+const User = require("./models/User"); 
+
+// BỔ SUNG 2: Import hàm checkLoans (Sửa lại đường dẫn này cho đúng với file của bạn)
+const checkLoans = require("./utils/loanchecker"); 
+
 connectDB();
 
 // ===== CONFIG =====
@@ -44,7 +51,7 @@ function loadFolder(folderPath) {
 loadFolder("commands");
 loadFolder("cogs");
 
-// Register Slash Commands (Giữ nguyên logic của bạn)
+// ===== REGISTER SLASH COMMANDS =====
 const rest = new REST({ version: "10" }).setToken(TOKEN);
 (async () => {
   try {
@@ -57,9 +64,21 @@ const rest = new REST({ version: "10" }).setToken(TOKEN);
   } catch (e) { console.error(e); }
 })();
 
-// ===== INTERACTION HANDLER (ĐÃ TỐI ƯU) =====
+// ===== INTERACTION HANDLER =====
 client.on(Events.InteractionCreate, async interaction => {
   try {
+    // ==========================================
+    // BỔ SUNG 3: KIỂM TRA BAN TOÀN CẦU TRƯỚC TIÊN
+    // Bất kể là Lệnh, Button hay Modal, nếu bị ban là chặn hết
+    // ==========================================
+    const userDB = await User.findOne({ userId: interaction.user.id });
+    if (userDB && userDB.banned) {
+        return interaction.reply({ 
+            content: "🚫 Tài khoản của bạn đã bị BAN vĩnh viễn do vi phạm hoặc trốn nợ!", 
+            flags: 64 // Ẩn thông báo
+        });
+    }
+
     // 1. XỬ LÝ SLASH COMMANDS
     if (interaction.isChatInputCommand()) {
       const command = client.commands.get(interaction.commandName);
@@ -72,9 +91,8 @@ client.on(Events.InteractionCreate, async interaction => {
       return await command.execute(interaction);
     }
 
-    // 2. XỬ LÝ BUTTONS (Tự động tìm command theo ID)
+    // 2. XỬ LÝ BUTTONS 
     if (interaction.isButton()) {
-        // Tách ID: "baucua_nai" -> lấy "baucua"
         const commandName = interaction.customId.split(/[_-]/)[0]; 
         const command = client.commands.get(commandName);
         
@@ -83,7 +101,7 @@ client.on(Events.InteractionCreate, async interaction => {
         }
     }
 
-    // 3. XỬ LÝ MODALS (Tự động tìm command theo ID)
+    // 3. XỬ LÝ MODALS 
     if (interaction.isModalSubmit()) {
         const commandName = interaction.customId.split(/[_-]/)[0];
         const command = client.commands.get(commandName);
@@ -93,12 +111,11 @@ client.on(Events.InteractionCreate, async interaction => {
         }
     }
 
-    // 4. XỬ LÝ STRING SELECT MENU (Dành cho SHOP mới)
+    // 4. XỬ LÝ STRING SELECT MENU
     if (interaction.isStringSelectMenu()) {
         const commandName = interaction.customId.split(/[_-]/)[0];
         const command = client.commands.get(commandName);
 
-        // Nếu shop sử dụng handleMenu hoặc logic bên trong execute của shop
         if (command && command.handleMenu) {
             return await command.handleMenu(interaction);
         }
@@ -112,5 +129,16 @@ client.on(Events.InteractionCreate, async interaction => {
   }
 });
 
-client.once(Events.ClientReady, c => console.log(`🤖 Bot online: ${c.user.tag}`));
+// ===== KHỞI ĐỘNG BOT VÀ CHẠY VÒNG LẶP =====
+client.once(Events.ClientReady, c => {
+    console.log(`🤖 Bot online: ${c.user.tag}`);
+
+    // BỔ SUNG 4: CHẠY VÒNG LẶP KIỂM TRA NỢ MỖI PHÚT
+    // Cứ 60 giây (60000ms), bot sẽ tự động gọi hàm checkLoans 1 lần
+    setInterval(() => {
+        checkLoans(client);
+    }, 60000); 
+    console.log("⏱️ Đã kích hoạt hệ thống kiểm tra nợ tự động.");
+});
+
 client.login(TOKEN);
