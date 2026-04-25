@@ -1,7 +1,12 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder } = require("discord.js");
 const User = require("../models/User");
 
-// --- HÀM TRỢ GIÚP ---
+// --- HÀM TÍNH TỔNG DPS (LỰC CHIẾN) ---
+function calculateDPS(card) {
+    const base = (card.hp * 0.1) + (card.atk * 2) + (card.def * 1.5) + (card.mdef * 1.5) + (card.spd * 5);
+    const offensive = (card.atkSpd * 100) * (1 + (card.critRate / 100) * (card.critDmg / 100));
+    return Math.floor(base + offensive);
+}
 
 function rollStat(baseValue) {
     const min = baseValue * 0.7;
@@ -12,11 +17,12 @@ function rollStat(baseValue) {
 }
 
 function createDetailEmbed(card, ownerName, resultMsg = "") {
+    const dps = calculateDPS(card);
     return new EmbedBuilder()
         .setColor(resultMsg.includes("✅") ? 0x2ecc71 : (resultMsg.includes("❌") ? 0xe74c3c : 0x3498db))
         .setTitle(`🃏 THẺ: ${card.name.toUpperCase()}`)
         .setAuthor({ name: `Chủ sở hữu: ${ownerName}` })
-        .setDescription(`${resultMsg}\n\n**Chỉ số hiện tại:**`)
+        .setDescription(`${resultMsg}\n\n**🔥 TỔNG LỰC CHIẾN (DPS): \`${dps.toLocaleString()}\`**`)
         .addFields(
             { name: "❤️ HP", value: `\`${card.hp}\``, inline: true },
             { name: "⚔️ ATK", value: `\`${card.atk}\``, inline: true },
@@ -43,16 +49,19 @@ module.exports = {
         const embed = new EmbedBuilder()
             .setColor(0xf1c40f)
             .setTitle("🎒 TÚI ĐỒ CỦA " + interaction.user.username)
-            .setDescription("Chọn thẻ để xem chi tiết (Menu tự xóa sau 30s)");
+            .setDescription("Bấm vào tên thẻ để xem chi tiết (Tự xóa sau 30s)");
 
         const row = new ActionRowBuilder();
-        user.cards.forEach((card, i) => {
-            row.addComponents(new ButtonBuilder().setCustomId(`tuido_view_${i}`).setLabel(`Thẻ ${i + 1}`).setStyle(ButtonStyle.Secondary));
+        user.cards.slice(0, 5).forEach((card, i) => {
+            row.addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`tuido_view_${i}`)
+                    .setLabel(`${i + 1}. ${card.name}`) // Hiển thị vị trí và tên thẻ lên nút
+                    .setStyle(ButtonStyle.Secondary)
+            );
         });
 
-        const msg = await interaction.reply({ embeds: [embed], components: [row], fetchReply: true });
-
-        // Tự động xóa menu chọn thẻ sau 30s
+        await interaction.reply({ embeds: [embed], components: [row] });
         setTimeout(() => interaction.deleteReply().catch(() => {}), 30000);
     },
 
@@ -66,7 +75,6 @@ module.exports = {
         if (!user || !user.cards[cardIndex]) return;
         const card = user.cards[cardIndex];
 
-        // --- XEM CHI TIẾT (CÔNG KHAI) ---
         if (action === "view") {
             const embed = createDetailEmbed(card, interaction.user.username);
             const row = new ActionRowBuilder().addComponents(
@@ -74,28 +82,19 @@ module.exports = {
                 new ButtonBuilder().setCustomId(`tuido_upgradebtn_${cardIndex}`).setLabel("Nâng Cấp Chỉ Định").setStyle(ButtonStyle.Success)
             );
 
-            const detailMsg = await interaction.reply({ embeds: [embed], components: [row], fetchReply: true });
-
-            // Tự động xóa chi tiết thẻ sau 60s nếu không ai nhấn gì
-            const collector = detailMsg.createMessageComponentCollector({ time: 60000 });
-            collector.on('end', collected => {
-                if (collected.size === 0) detailMsg.delete().catch(() => {});
-            });
-            return;
+            return interaction.reply({ embeds: [embed], components: [row] });
         }
 
-        // --- QUAY ALL ---
         if (action === "rollall") {
             if (user.money < 50000) return interaction.reply({ content: "❌ Bạn không đủ tiền!", flags: 64 });
             user.money -= 50000;
             ["hp", "atk", "def", "mdef", "spd", "atkSpd", "critRate", "critDmg"].forEach(s => card[s] = rollStat(card[s]));
             user.markModified('cards');
             await user.save();
-
             return interaction.update({ embeds: [createDetailEmbed(card, interaction.user.username, "🎲 **Đã quay lại toàn bộ chỉ số!**")] });
         }
 
-        // --- GỌI MENU CHỌN CHỈ SỐ ---
+        // --- SỬA TRỰC TIẾP HÀNG NÚT THÀNH MENU CHỌN CHỈ SỐ ---
         if (action === "upgradebtn") {
             const menuRow = new ActionRowBuilder().addComponents(
                 new StringSelectMenuBuilder()
@@ -107,10 +106,10 @@ module.exports = {
                         { label: "Chí Mạng", value: "critRate" }, { label: "ST Chí Mạng", value: "critDmg" }
                     ])
             );
-            return interaction.reply({ content: "Chọn chỉ số nâng cấp:", components: [menuRow], flags: 64 });
+            // Sửa tin nhắn hiện tại thay vì reply mới
+            return interaction.update({ components: [menuRow] });
         }
 
-        // --- NÚT ĐẬP TIẾP TỤC (SPAM) ---
         if (action === "fastup") {
             await this.logicUpgrade(interaction, user, cardIndex, statToFastUp);
         }
@@ -123,16 +122,15 @@ module.exports = {
         await this.logicUpgrade(interaction, user, parseInt(parts[2]), interaction.values[0]);
     },
 
-    // --- LOGIC NÂNG CẤP DÙNG CHUNG ---
     async logicUpgrade(interaction, user, cardIndex, stat) {
         const card = user.cards[cardIndex];
         const multiplier = Math.max(1, Math.floor(card[stat] / 100));
         const cost = 100000 * multiplier;
 
-        if (user.money < cost) return interaction.reply({ content: `❌ Cần ${cost.toLocaleString()} VND để đập tiếp!`, flags: 64 });
+        if (user.money < cost) return interaction.reply({ content: `❌ Cần ${cost.toLocaleString()} VND!`, flags: 64 });
 
         user.money -= cost;
-        let successRate = 0.8 - (card[stat] / 3000); // Tỉ lệ xịt tăng theo chỉ số
+        let successRate = 0.8 - (card[stat] / 3000);
         if (successRate < 0.1) successRate = 0.1;
 
         let resultText = "";
@@ -151,15 +149,12 @@ module.exports = {
 
         const newEmbed = createDetailEmbed(card, interaction.user.username, `🔔 **Nâng cấp ${stat.toUpperCase()}:** ${resultText}\n💰 Chi phí: -${cost.toLocaleString()} VND`);
         
-        // Nút bấm để đập tiếp chỉ số đó luôn
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`tuido_fastup_${cardIndex}_${stat}`).setLabel(`Đập tiếp ${stat.toUpperCase()}`).setStyle(ButtonStyle.Danger),
             new ButtonBuilder().setCustomId(`tuido_upgradebtn_${cardIndex}`).setLabel("Đổi chỉ số khác").setStyle(ButtonStyle.Secondary)
         );
 
-        // Update trực tiếp tin nhắn công khai
-        if (interaction.isStringSelectMenu() || interaction.customId.includes("fastup")) {
-            return interaction.update({ embeds: [newEmbed], components: [row], content: "" });
-        }
+        // Luôn cập nhật vào bảng Stats cũ
+        return interaction.update({ embeds: [newEmbed], components: [row] });
     }
 };
