@@ -86,8 +86,8 @@ module.exports = {
         }
 
         if (action === "rollall") {
-            if (user.money < 50000) return interaction.reply({ content: "❌ Bạn không đủ tiền!", flags: 64 });
-            user.money -= 50000;
+            if (user.money < 10000000) return interaction.reply({ content: "❌ Bạn không đủ tiền!", flags: 64 });
+            user.money -= 10000000;
             ["hp", "atk", "def", "mdef", "spd", "atkSpd", "critRate", "critDmg"].forEach(s => card[s] = rollStat(card[s]));
             user.markModified('cards');
             await user.save();
@@ -124,8 +124,8 @@ module.exports = {
 
     async logicUpgrade(interaction, user, cardIndex, stat) {
         const card = user.cards[cardIndex];
-        const multiplier = Math.max(1, Math.floor(card[stat] / 100));
-        const cost = 100000 * multiplier;
+        const multiplier = Math.max(1, Math.floor(card[stat] / 1000));
+        const cost = 1000000 * multiplier;
 
         if (user.money < cost) return interaction.reply({ content: `❌ Cần ${cost.toLocaleString()} VND!`, flags: 64 });
 
