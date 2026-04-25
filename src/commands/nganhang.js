@@ -13,7 +13,7 @@ const User = require("../models/User");
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("nganhang")
-        .setDescription("🏦 Ngân hàng Trung ương - Lãi suất 4%/giờ"),
+        .setDescription("🏦 Ngân hàng Trung ương - Lãi suất 0.3%/giờ"),
 
     async execute(interaction) {
         let user = await User.findOne({ userId: interaction.user.id });
@@ -25,8 +25,8 @@ module.exports = {
             const ms = Date.now() - new Date(user.lastDepositAt).getTime();
             const hours = ms / (1000 * 60 * 60);
             if (hours >= 1) {
-                // Công thức lãi kép: Gốc * (1 + r)^n - Gốc
-                interest = Math.floor(user.bankMoney * (Math.pow(1.04, Math.floor(hours)) - 1));
+                // Công thức lãi kép: Gốc * (1 + r)^n - Gốc (r = 0.3% = 0.003)
+                interest = Math.floor(user.bankMoney * (Math.pow(1.003, Math.floor(hours)) - 1));
             }
         }
 
@@ -38,7 +38,7 @@ module.exports = {
                 `Chào **${interaction.user.username}**, tình trạng tài sản của bạn:\n\n` +
                 `💵 Tiền mặt: **${user.money.toLocaleString()} VND**\n` +
                 `🏦 Gửi tiết kiệm: **${user.bankMoney.toLocaleString()} VND**\n` +
-                `📈 Lãi tích lũy: **+${interest.toLocaleString()} VND** *(4%/h)*\n\n` +
+                `📈 Lãi tích lũy: **+${interest.toLocaleString()} VND** *(0.3%/h)*\n\n` +
                 `*Lãi suất sẽ được cộng dồn sau mỗi giờ gửi!*`
             )
             .setFooter({ text: "Tự động xóa sau 30 giây" })
@@ -115,7 +115,7 @@ module.exports = {
             if (user.bankMoney > 0 && user.lastDepositAt) {
                 const hours = (Date.now() - new Date(user.lastDepositAt).getTime()) / (1000 * 60 * 60);
                 if (hours >= 1) {
-                    const interest = Math.floor(user.bankMoney * (Math.pow(1.04, Math.floor(hours)) - 1));
+                    const interest = Math.floor(user.bankMoney * (Math.pow(1.003, Math.floor(hours)) - 1));
                     user.bankMoney += interest;
                 }
             }
@@ -136,7 +136,7 @@ module.exports = {
             let interest = 0;
             const hours = (Date.now() - new Date(user.lastDepositAt).getTime()) / (1000 * 60 * 60);
             if (hours >= 1) {
-                interest = Math.floor(user.bankMoney * (Math.pow(1.04, Math.floor(hours)) - 1));
+                interest = Math.floor(user.bankMoney * (Math.pow(1.003, Math.floor(hours)) - 1));
             }
 
             const isAll = (amount >= user.bankMoney);
