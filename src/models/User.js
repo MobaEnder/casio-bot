@@ -23,7 +23,7 @@ const userSchema = new mongoose.Schema({
     totalSpent: { type: Number, default: 0 }, 
   },
 
-  // 🎒 Hệ thống Túi đồ
+  // 🎒 Hệ thống Túi đồ (Item thường)
   inventory: [
     {
       itemId: { type: String },
@@ -31,6 +31,19 @@ const userSchema = new mongoose.Schema({
       acquiredAt: { type: Date, default: Date.now },
     }
   ],
+
+  // 🃏 Hệ thống Thẻ bài (Gacha)
+  cards: {
+    type: Array,
+    default: []
+    /* Cấu trúc mỗi thẻ được lưu:
+    {
+        name: String,
+        hp: Number, atk: Number, spd: Number, def: Number, mdef: Number, 
+        atkSpd: Number, critRate: Number, critDmg: Number, price: Number
+    }
+    */
+  },
 
   // 🛡️ Hệ thống Bảo vệ (Ăn trộm sẽ check cái này)
   // 0: Không bảo vệ, 1: Cấp thấp, 2: Cấp cao
