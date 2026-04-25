@@ -178,7 +178,7 @@ async function startMatch(gameId) {
         const finalEmbed = new EmbedBuilder()
             .setColor(0xffd700)
             .setTitle(`🏆 NHÀ VÔ ĐỊCH: ${winner.name.toUpperCase()}`)
-            .setThumbnail("https://i.imgur.com/8f6fNAs.png")
+            .setThumbnail("https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR0i08VarAesO8M6LLzBhHB8XGAEjxHA2dFrA&s")
             .setDescription(
                 `🏁 Đội **${winner.emoji} ${winner.name}** đã xuất sắc giành chiến thắng!\n\n` +
                 `💰 **Người thắng kèo:**\n${winnersList.join("\n") || "Không có đại gia nào chọn đúng!"}`
