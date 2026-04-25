@@ -51,63 +51,98 @@ module.exports = {
             const game = games.get(response.id);
             if (!game) return;
 
-            const d1 = Math.floor(Math.random() * 6) + 1;
-            const d2 = Math.floor(Math.random() * 6) + 1;
-            const d3 = Math.floor(Math.random() * 6) + 1;
-            const sum = d1 + d2 + d3;
-            const result = sum >= 11 ? "tai" : "xiu";
+            // ================= LÕI HỆ THỐNG NHÀ CÁI BỊP =================
+            // 1. Tính tổng tiền cược của 2 bên
+            let totalTai = 0;
+            let totalXiu = 0;
+            for (const bet of game.bets.values()) {
+                if (bet.choice === "tai") totalTai += bet.amount;
+                else totalXiu += bet.amount;
+            }
+
+            // 2. Quyết định kết quả (65% Nhà cái thắng, 35% Người chơi thắng)
+            let targetResult = "tai";
+            if (totalTai === 0 && totalXiu === 0) {
+                // Không ai cược thì 50/50 cho vui
+                targetResult = Math.random() < 0.5 ? "tai" : "xiu";
+            } else {
+                const isHouseWin = Math.random() < 0.65; // 65% cơ hội ra kết quả giết đám đông
+                
+                if (totalTai > totalXiu) {
+                    // Người chơi cược TÀI nhiều hơn -> Nhà cái muốn XỈU
+                    targetResult = isHouseWin ? "xiu" : "tai";
+                } else if (totalXiu > totalTai) {
+                    // Người chơi cược XỈU nhiều hơn -> Nhà cái muốn TÀI
+                    targetResult = isHouseWin ? "tai" : "xiu";
+                } else {
+                    // Cược bằng tiền nhau -> 50/50
+                    targetResult = Math.random() < 0.5 ? "tai" : "xiu";
+                }
+            }
+
+            // 3. Đổ xúc xắc "bịp" sao cho khớp với kết quả đã định sẵn
+            let d1, d2, d3, sum;
+            do {
+                d1 = Math.floor(Math.random() * 6) + 1;
+                d2 = Math.floor(Math.random() * 6) + 1;
+                d3 = Math.floor(Math.random() * 6) + 1;
+                sum = d1 + d2 + d3;
+            } while ((targetResult === "tai" && sum < 11) || (targetResult === "xiu" && sum >= 11));
+
+            const result = targetResult;
             const resultEmote = result === "tai" ? "🔥 TÀI" : "❄️ XỈU";
+            // ==============================================================
 
             let winners = [];
             let losers = [];
 
             // Xử lý tiền cược sau khi có kết quả
             for (const [userId, bet] of game.bets.entries()) {
-    const uData = await User.findOne({ userId });
-    if (!uData) continue;
+                const uData = await User.findOne({ userId });
+                if (!uData) continue;
 
-    let usedBuffs = []; // Để lưu thông báo bùa đã dùng
+                let usedBuffs = []; // Để lưu thông báo bùa đã dùng
 
-    if (bet.choice === result) {
-        // --- XỬ LÝ LUCK ---
-        if (uData.buffs.winRateBoost > 0) {
-            usedBuffs.push(`🍀 Bùa Luck (${uData.buffs.winRateBoost * 100}%)`);
-            uData.buffs.winRateBoost = 0; // Xóa bùa
-        }
+                if (bet.choice === result) {
+                    // --- XỬ LÝ LUCK ---
+                    if (uData.buffs.winRateBoost > 0) {
+                        usedBuffs.push(`🍀 Bùa Luck (${uData.buffs.winRateBoost * 100}%)`);
+                        uData.buffs.winRateBoost = 0; // Xóa bùa
+                    }
 
-        const winAmt = bet.amount * 2;
-        uData.money += winAmt;
-        uData.stats.win++;
-        winners.push(`<@${userId}> (+\`${bet.amount.toLocaleString()}\`)${usedBuffs.length ? " [" + usedBuffs.join(", ") + "]" : ""}`);
-    } else {
-        // --- XỬ LÝ SHIELD ---
-        let lossAmount = bet.amount;
-        if (uData.buffs.shield > 0) {
-            const reducedLoss = bet.amount * (1 - uData.buffs.shield);
-            const savedAmount = bet.amount - reducedLoss;
-            uData.money += Math.floor(savedAmount); // Trả lại phần tiền được khiên bảo vệ
-            lossAmount = Math.floor(reducedLoss);
-            usedBuffs.push(`🔰 Khiên (${uData.buffs.shield * 100}%)`);
-            uData.buffs.shield = 0; // Xóa khiên
-        }
+                    const winAmt = bet.amount * 2;
+                    uData.money += winAmt;
+                    uData.stats.win++;
+                    winners.push(`<@${userId}> (+\`${bet.amount.toLocaleString()}\`)${usedBuffs.length ? " [" + usedBuffs.join(", ") + "]" : ""}`);
+                } else {
+                    // --- XỬ LÝ SHIELD ---
+                    let lossAmount = bet.amount;
+                    if (uData.buffs.shield > 0) {
+                        const reducedLoss = bet.amount * (1 - uData.buffs.shield);
+                        const savedAmount = bet.amount - reducedLoss;
+                        uData.money += Math.floor(savedAmount); // Trả lại phần tiền được khiên bảo vệ
+                        lossAmount = Math.floor(reducedLoss);
+                        usedBuffs.push(`🔰 Khiên (${uData.buffs.shield * 100}%)`);
+                        uData.buffs.shield = 0; // Xóa khiên
+                    }
 
-        // Nếu có bùa luck mà thua thì vẫn mất bùa
-        if (uData.buffs.winRateBoost > 0) {
-            usedBuffs.push(`🍀 Bùa Luck (${uData.buffs.winRateBoost * 100}%)`);
-            uData.buffs.winRateBoost = 0;
-        }
+                    // Nếu có bùa luck mà thua thì vẫn mất bùa
+                    if (uData.buffs.winRateBoost > 0) {
+                        usedBuffs.push(`🍀 Bùa Luck (${uData.buffs.winRateBoost * 100}%)`);
+                        uData.buffs.winRateBoost = 0;
+                    }
 
-        uData.stats.lose++;
-        losers.push(`<@${userId}> (-\`${lossAmount.toLocaleString()}\`)${usedBuffs.length ? " [" + usedBuffs.join(", ") + "]" : ""}`);
-    }
-    uData.stats.gamblePlayed++;
-    await uData.save();
-}
+                    uData.stats.lose++;
+                    losers.push(`<@${userId}> (-\`${lossAmount.toLocaleString()}\`)${usedBuffs.length ? " [" + usedBuffs.join(", ") + "]" : ""}`);
+                }
+                uData.stats.gamblePlayed++;
+                await uData.save();
+            }
 
             const resultEmbed = new EmbedBuilder()
                 .setColor(result === "tai" ? "Green" : "Blue")
                 .setTitle("🎉 KẾT QUẢ: " + resultEmote)
-                .setThumbnail("https://kenh14cdn.com/thumb_w/600/70e2b6983a/2015/10/24/151024dice02-0504a.jpg") // Có thể thêm ảnh xúc xắc
+                .setThumbnail("https://kenh14cdn.com/thumb_w/600/70e2b6983a/2015/10/24/151024dice02-0504a.jpg")
                 .setDescription(
                     `🎲 Bộ ba: **${d1} - ${d2} - ${d3}** (Tổng: **${sum}**)\n\n` +
                     `🏆 **Thắng:** ${winners.slice(0, 10).join(", ") || "Trắng tay"}${winners.length > 10 ? "..." : ""}\n` +

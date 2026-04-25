@@ -38,7 +38,7 @@ function generateChart(history) {
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("chungkhoan")
-        .setDescription("📈 Chứng khoán 15s - Tỉ lệ thắng 40%"),
+        .setDescription("📈 Chứng khoán 15s - Tỉ lệ thắng 35%"),
 
     async execute(interaction) {
         const embed = new EmbedBuilder()
@@ -107,9 +107,9 @@ module.exports = {
                 nextPrice = Math.max(1, history[history.length - 1] + change);
             } else {
                 /* ========================================= */
-                /* 🎯 LOGIC TỈ LỆ THẮNG 40/60                */
+                /* 🎯 LOGIC TỈ LỆ THẮNG 35/65                */
                 /* ========================================= */
-                const isWin = Math.random() < 0.4; // 40% cơ hội thắng
+                const isWin = Math.random() < 0.35; // 35% cơ hội thắng
 
                 if (side === "up") {
                     // Nếu đặt LÊN: Thắng thì giá > startPrice, Thua thì giá < startPrice
