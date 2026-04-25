@@ -44,7 +44,7 @@ module.exports = {
             .setFooter({ text: "BOT Casino - Đừng tin vào trọng tài!" });
 
         const select = new StringSelectMenuBuilder()
-            .setCustomId("select_team")
+            .setCustomId("cadobongda_select") // SỬA: Phải bắt đầu bằng tên lệnh
             .setPlaceholder("Chọn chiến mã của bạn...")
             .addOptions(teams.map((t, i) => ({ label: t.name, value: i.toString(), emoji: t.emoji })));
 
@@ -61,7 +61,8 @@ module.exports = {
         setTimeout(() => startMatch(response.id), BET_TIME);
     },
 
-    async handleSelectMenu(interaction) {
+    // SỬA: Đổi tên thành handleMenu để khớp với index.js của bạn
+    async handleMenu(interaction) {
         const game = games.get(interaction.message.id);
         if (!game || game.isStarted) return interaction.reply({ content: "❌ Trận đấu đã bắt đầu hoặc không tồn tại!", flags: 64 });
 
@@ -69,7 +70,7 @@ module.exports = {
         const team = teams[teamIndex];
 
         const modal = new ModalBuilder()
-            .setCustomId(`cado_modal_${teamIndex}`)
+            .setCustomId(`cadobongda_modal_${teamIndex}`) // SỬA: Phải bắt đầu bằng tên lệnh
             .setTitle(`Cược cho ${team.name}`);
 
         const input = new TextInputBuilder()
@@ -93,6 +94,8 @@ module.exports = {
 
         const user = await User.findOne({ userId: interaction.user.id });
         if (!user || user.money < amount) return interaction.reply({ content: "❌ Bạn không đủ tiền!", flags: 64 });
+        
+        // Check ban đã có ở index.js nhưng có thể giữ lại cho chắc
         if (user.banned) return interaction.reply({ content: "🚫 Bạn đang bị cấm cờ bạc!", flags: 64 });
 
         user.money -= amount;
@@ -113,15 +116,13 @@ async function startMatch(gameId) {
     game.isStarted = true;
 
     // --- LOGIC NHÀ CÁI BỊP (Tỉ lệ thắng 40%) ---
-    // Tính xem đội nào bị đặt tiền nhiều nhất
     let teamTotals = new Array(teams.length).fill(0);
     game.bets.forEach(bet => teamTotals[bet.teamIndex] += bet.amount);
 
     let winnerIndex;
-    const isHouseRig = Math.random() < 0.60; // 60% tỉ lệ nhà cái muốn "bóp"
+    const isHouseRig = Math.random() < 0.60; 
 
     if (isHouseRig) {
-        // Tìm những đội có ít tiền cược nhất để cho thắng
         const minMoney = Math.min(...teamTotals);
         const candidates = teamTotals.map((val, idx) => val === minMoney ? idx : null).filter(v => v !== null);
         winnerIndex = candidates[Math.floor(Math.random() * candidates.length)];
@@ -137,13 +138,11 @@ async function startMatch(gameId) {
     const interval = setInterval(async () => {
         let chartDisplay = "";
         
-        // Chỉ hiện top những đội có người cược để đỡ dài
         const activeTeams = [];
         game.bets.forEach(bet => { if(!activeTeams.includes(bet.teamIndex)) activeTeams.push(bet.teamIndex) });
         if (!activeTeams.includes(winnerIndex)) activeTeams.push(winnerIndex);
 
         activeTeams.sort((a, b) => b === winnerIndex ? 1 : -1).forEach(idx => {
-            // Tăng tiến trình, đội thắng sẽ nhanh hơn
             if (idx === winnerIndex) progress[idx] += Math.random() * 15;
             else progress[idx] += Math.random() * 10;
 

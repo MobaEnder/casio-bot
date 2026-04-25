@@ -17,7 +17,7 @@ const BET_TIME = 30000;   // 30 giây đặt cược
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("daga")
-        .setDescription("🐔 Đá gà - Tỉ lệ thắng 40% (Nhà cái 60%)"),
+        .setDescription("🐔 Đá gà"),
 
     async execute(interaction) {
         const embed = new EmbedBuilder()

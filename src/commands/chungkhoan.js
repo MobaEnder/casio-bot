@@ -38,7 +38,7 @@ function generateChart(history) {
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("chungkhoan")
-        .setDescription("📈 Chứng khoán 15s - Tỉ lệ thắng 35%"),
+        .setDescription("📈 Chứng khoán 15s"),
 
     async execute(interaction) {
         const embed = new EmbedBuilder()
