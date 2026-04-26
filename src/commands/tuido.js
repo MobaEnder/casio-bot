@@ -78,7 +78,7 @@ module.exports = {
         if (action === "view") {
             const embed = createDetailEmbed(card, interaction.user.username);
             const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId(`tuido_rollall_${cardIndex}`).setLabel("Quay All (50k)").setStyle(ButtonStyle.Primary),
+                new ButtonBuilder().setCustomId(`tuido_rollall_${cardIndex}`).setLabel("Quay All (50tr)").setStyle(ButtonStyle.Primary),
                 new ButtonBuilder().setCustomId(`tuido_upgradebtn_${cardIndex}`).setLabel("Nâng Cấp Chỉ Định").setStyle(ButtonStyle.Success)
             );
 
