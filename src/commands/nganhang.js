@@ -38,7 +38,7 @@ module.exports = {
                 `Chào **${interaction.user.username}**, tình trạng tài sản của bạn:\n\n` +
                 `💵 Tiền mặt: **${user.money.toLocaleString()} VND**\n` +
                 `🏦 Gửi tiết kiệm: **${user.bankMoney.toLocaleString()} VND**\n` +
-                `📈 Lãi tích lũy: **+${interest.toLocaleString()} VND** *(0.3%/h)*\n\n` +
+                `📈 Lãi tích lũy: **+${interest.toLocaleString()} VND** *(0.8%/h)*\n\n` +
                 `*Lãi suất sẽ được cộng dồn sau mỗi giờ gửi!*`
             )
             .setFooter({ text: "Tự động xóa sau 30 giây" })
