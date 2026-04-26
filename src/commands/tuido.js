@@ -1,13 +1,16 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder } = require("discord.js");
 const User = require("../models/User");
 
-// --- HÀM TÍNH TỔNG DPS (LỰC CHIẾN) ---
+// --- 1. HÀM TÍNH TỔNG LỰC CHIẾN (DPS) ---
 function calculateDPS(card) {
+    const level = card.level || 1;
     const base = (card.hp * 0.1) + (card.atk * 2) + (card.def * 1.5) + (card.mdef * 1.5) + (card.spd * 5);
     const offensive = (card.atkSpd * 100) * (1 + (card.critRate / 100) * (card.critDmg / 100));
-    return Math.floor(base + offensive);
+    // Level tăng 5% sức mạnh mỗi cấp
+    return Math.floor((base + offensive) * (1 + (level - 1) * 0.05));
 }
 
+// --- 2. HÀM QUAY CHỈ SỐ (Gacha Stat) ---
 function rollStat(baseValue) {
     const min = baseValue * 0.7;
     const max = baseValue * 1.3;
@@ -16,13 +19,18 @@ function rollStat(baseValue) {
     return parseFloat(result.toFixed(2));
 }
 
+// --- 3. TẠO EMBED CHI TIẾT THẺ ---
 function createDetailEmbed(card, ownerName, resultMsg = "") {
     const dps = calculateDPS(card);
+    const level = card.level || 1;
+    const exp = card.exp || 0;
+    const nextExp = level * 1000; // Thống nhất công thức: Level * 1000
+
     return new EmbedBuilder()
         .setColor(resultMsg.includes("✅") ? 0x2ecc71 : (resultMsg.includes("❌") ? 0xe74c3c : 0x3498db))
-        .setTitle(`🃏 THẺ: ${card.name.toUpperCase()}`)
+        .setTitle(`🃏 THẺ: ${card.name.toUpperCase()} [Lv. ${level}]`)
         .setAuthor({ name: `Chủ sở hữu: ${ownerName}` })
-        .setDescription(`${resultMsg}\n\n**🔥 TỔNG LỰC CHIẾN (DPS): \`${dps.toLocaleString()}\`**`)
+        .setDescription(`${resultMsg}\n\n**⭐ Cấp độ: \`${level}/100\` | 💠 EXP: \`${exp}/${nextExp}\`**\n**🔥 TỔNG LỰC CHIẾN (DPS): \`${dps.toLocaleString()}\`**`)
         .addFields(
             { name: "❤️ HP", value: `\`${card.hp}\``, inline: true },
             { name: "⚔️ ATK", value: `\`${card.atk}\``, inline: true },
@@ -33,7 +41,7 @@ function createDetailEmbed(card, ownerName, resultMsg = "") {
             { name: "🎯 CRIT", value: `\`${card.critRate}%\``, inline: true },
             { name: "💥 CDMG", value: `\`${card.critDmg}%\``, inline: true }
         )
-        .setFooter({ text: "Tin nhắn tự hủy sau 60s nếu không hoạt động." });
+        .setFooter({ text: "Leo tháp để nhận thêm EXP và thăng cấp thẻ bài!" });
 }
 
 module.exports = {
@@ -53,10 +61,11 @@ module.exports = {
 
         const row = new ActionRowBuilder();
         user.cards.slice(0, 5).forEach((card, i) => {
+            const lv = card.level || 1;
             row.addComponents(
                 new ButtonBuilder()
                     .setCustomId(`tuido_view_${i}`)
-                    .setLabel(`${i + 1}. ${card.name}`) // Hiển thị vị trí và tên thẻ lên nút
+                    .setLabel(`[Lv.${lv}] ${card.name}`) // ĐÃ SỬA: Hiển thị Level lên nút bấm
                     .setStyle(ButtonStyle.Secondary)
             );
         });
@@ -78,11 +87,11 @@ module.exports = {
         if (action === "view") {
             const embed = createDetailEmbed(card, interaction.user.username);
             const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId(`tuido_rollall_${cardIndex}`).setLabel("Quay All (50tr)").setStyle(ButtonStyle.Primary),
+                new ButtonBuilder().setCustomId(`tuido_rollall_${cardIndex}`).setLabel("Quay All (10tr)").setStyle(ButtonStyle.Primary),
                 new ButtonBuilder().setCustomId(`tuido_upgradebtn_${cardIndex}`).setLabel("Nâng Cấp Chỉ Định").setStyle(ButtonStyle.Success)
             );
 
-            return interaction.reply({ embeds: [embed], components: [row] });
+            return interaction.reply({ embeds: [embed], components: [row], flags: 64 });
         }
 
         if (action === "rollall") {
@@ -94,7 +103,6 @@ module.exports = {
             return interaction.update({ embeds: [createDetailEmbed(card, interaction.user.username, "🎲 **Đã quay lại toàn bộ chỉ số!**")] });
         }
 
-        // --- SỬA TRỰC TIẾP HÀNG NÚT THÀNH MENU CHỌN CHỈ SỐ ---
         if (action === "upgradebtn") {
             const menuRow = new ActionRowBuilder().addComponents(
                 new StringSelectMenuBuilder()
@@ -106,7 +114,6 @@ module.exports = {
                         { label: "Chí Mạng", value: "critRate" }, { label: "ST Chí Mạng", value: "critDmg" }
                     ])
             );
-            // Sửa tin nhắn hiện tại thay vì reply mới
             return interaction.update({ components: [menuRow] });
         }
 
@@ -154,7 +161,6 @@ module.exports = {
             new ButtonBuilder().setCustomId(`tuido_upgradebtn_${cardIndex}`).setLabel("Đổi chỉ số khác").setStyle(ButtonStyle.Secondary)
         );
 
-        // Luôn cập nhật vào bảng Stats cũ
         return interaction.update({ embeds: [newEmbed], components: [row] });
     }
 };

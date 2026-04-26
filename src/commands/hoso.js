@@ -1,6 +1,14 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const User = require("../models/User");
 
+// --- HÀM TÍNH DPS (Phải đồng nhất với logic trong /tuido) ---
+function calculateDPS(card) {
+    const level = card.level || 1;
+    const base = (card.hp * 0.1) + (card.atk * 2) + (card.def * 1.5) + (card.mdef * 1.5) + (card.spd * 5);
+    const offensive = (card.atkSpd * 100) * (1 + (card.critRate / 100) * (card.critDmg / 100));
+    return Math.floor((base + offensive) * (1 + (level - 1) * 0.05));
+}
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("hoso")
@@ -17,44 +25,47 @@ module.exports = {
             return interaction.reply({ content: "❌ Người này chưa từng tham gia casino!", flags: 64 });
         }
 
-        // --- LOGIC TÍNH LÃI SUẤT NGÂN HÀNG ---
+        // 1. LOGIC TÍNH LÃI SUẤT NGÂN HÀNG
         let interest = 0;
         if (user.bankMoney > 0 && user.lastDepositAt) {
             const ms = Date.now() - new Date(user.lastDepositAt).getTime();
             const hours = ms / (1000 * 60 * 60);
             if (hours >= 1) {
-                // Tính lãi tạm tính: Gốc * (1 + 4%)^giờ - Gốc
                 interest = Math.floor(user.bankMoney * (Math.pow(1.04, Math.floor(hours)) - 1));
             }
         }
         const totalInBank = user.bankMoney + interest;
 
-        // 🎨 Thiết lập màu sắc (Đổi màu đỏ nếu bị BAN)
-        let profileColor = 0x00ff99; 
-        if (user.banned) profileColor = 0xFF0000;
+        // 2. LOGIC TÌM THẺ BÀI MẠNH NHẤT
+        let strongestCardInfo = "Chưa có thẻ bài";
+        if (user.cards && user.cards.length > 0) {
+            // Sắp xếp thẻ theo DPS giảm dần
+            const sortedCards = [...user.cards].sort((a, b) => calculateDPS(b) - calculateDPS(a));
+            const topCard = sortedCards[0];
+            const topDps = calculateDPS(topCard);
+            strongestCardInfo = `🎴 **${topCard.name}** (Lv.${topCard.level || 1})\n🔥 Lực chiến: \`${topDps.toLocaleString()}\``;
+        }
 
-        // 🏆 Xử lý Danh hiệu & Bùa chú
+        // 3. THIẾT LẬP HIỂN THỊ
+        let profileColor = user.banned ? 0xFF0000 : 0x00ff99;
         const title = user.titles?.active || "Dân Thường";
         const luckBuff = user.buffs?.winRateBoost > 0 ? `🍀 Luck +${user.buffs.winRateBoost * 100}%` : "Không có";
         const shieldBuff = user.buffs?.shield > 0 ? `🛡️ Khiên -${user.buffs.shield * 100}%` : "Không có";
         
-        // 👮 Bảo vệ
         const guards = ["❌ Trống", "💂 Cận Vệ Tập Sự", "🎖️ Đặc Nhiệm Hoàng Gia"];
         const currentGuard = guards[user.securityLevel || 0];
 
-        // 📊 Tính tỉ lệ thắng
         const stats = user.stats || { win: 0, lose: 0 };
         const totalGamble = stats.win + stats.lose;
         const winRate = totalGamble > 0 ? ((stats.win / totalGamble) * 100).toFixed(1) : 0;
 
-        // 🏦 Xử lý Nợ
         let loanInfo = "✅ Sạch nợ";
         if (user.loan && user.loan.active) {
             loanInfo = `⚠️ **Nợ:** \`${user.loan.amount.toLocaleString()} VND\`\n` +
-                       `👤 **Chủ nợ:** <@${user.loan.from}>\n` +
-                       `⏰ **Hạn:** <t:${Math.floor(user.loan.dueAt.getTime() / 1000)}:R>`;
+                       `👤 **Chủ nợ:** <@${user.loan.from}>`;
         }
 
+        // 4. TẠO EMBED
         const profileEmbed = new EmbedBuilder()
             .setColor(profileColor)
             .setTitle(`✨ HỒ SƠ CỦA ${target.username.toUpperCase()} ✨`)
@@ -64,18 +75,27 @@ module.exports = {
                 { 
                     name: "💰 Tài Chính", 
                     value: `💵 **Tiền mặt:** \`${user.money.toLocaleString()} VND\`\n` +
-                           `🏦 **Ngân hàng:** \`${totalInBank.toLocaleString()} VND\`\n` +
-                           (interest > 0 ? `*(Trong đó có ${interest.toLocaleString()} lãi)*` : `*(Chưa có lãi mới)*`),
+                           `🏦 **Ngân hàng:** \`${totalInBank.toLocaleString()} VND\``,
                     inline: false 
                 },
                 { 
+                    name: "🏰 Chinh Phục Tháp", 
+                    value: `🚩 **Tầng hiện tại:** \`${user.towerFloor || 1}/150\`\n⚡ **Lượt hôm nay:** \`${user.towerAttempts || 0}\``,
+                    inline: true 
+                },
+                { 
+                    name: "⚔️ Thẻ Bài Mạnh Nhất", 
+                    value: strongestCardInfo,
+                    inline: true 
+                },
+                { 
                     name: "🧿 Trang Bị & Bảo Vệ", 
-                    value: `✨ **Bùa Luck:** ${luckBuff}\n🔰 **Bùa Khiên:** ${shieldBuff}\n🛡️ **Bảo vệ:** ${currentGuard}`,
+                    value: `✨ **Bùa:** ${luckBuff} | ${shieldBuff}\n🛡️ **Vệ sĩ:** ${currentGuard}`,
                     inline: false 
                 },
                 { 
                     name: "📈 Thống Kê Casino", 
-                    value: `✅ **Thắng:** ${stats.win}\n❌ **Thua:** ${stats.lose}\n📊 **Tỉ lệ:** ${winRate}%`,
+                    value: `✅ Win: ${stats.win} | ❌ Lose: ${stats.lose}\n📊 Tỉ lệ: ${winRate}%`,
                     inline: true 
                 },
                 { 
