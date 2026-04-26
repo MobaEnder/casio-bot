@@ -87,7 +87,7 @@ module.exports = {
         if (action === "view") {
             const embed = createDetailEmbed(card, interaction.user.username);
             const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId(`tuido_rollall_${cardIndex}`).setLabel("Quay All (10tr)").setStyle(ButtonStyle.Primary),
+                new ButtonBuilder().setCustomId(`tuido_rollall_${cardIndex}`).setLabel("Quay All (500k)").setStyle(ButtonStyle.Primary),
                 new ButtonBuilder().setCustomId(`tuido_upgradebtn_${cardIndex}`).setLabel("Nâng Cấp Chỉ Định").setStyle(ButtonStyle.Success)
             );
 
@@ -95,8 +95,8 @@ module.exports = {
         }
 
         if (action === "rollall") {
-            if (user.money < 10000000) return interaction.reply({ content: "❌ Bạn không đủ tiền!", flags: 64 });
-            user.money -= 10000000;
+            if (user.money < 1000000) return interaction.reply({ content: "❌ Bạn không đủ tiền!", flags: 64 });
+            user.money -= 1000000;
             ["hp", "atk", "def", "mdef", "spd", "atkSpd", "critRate", "critDmg"].forEach(s => card[s] = rollStat(card[s]));
             user.markModified('cards');
             await user.save();
