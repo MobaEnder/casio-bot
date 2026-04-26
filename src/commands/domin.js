@@ -6,7 +6,7 @@ const {
     ButtonStyle, 
     ComponentType 
 } = require("discord.js");
-const User = require("../models/User"); // QUAN TRỌNG: Kiểm tra kỹ đường dẫn này
+const User = require("../models/User");
 
 // --- LOGIC KHỞI TẠO BÀN CỜ ---
 function createBoard(size, mineCount) {
@@ -18,7 +18,6 @@ function createBoard(size, mineCount) {
             isFlagged: false
         }))
     );
-
     let plantedMines = 0;
     while (plantedMines < mineCount) {
         const r = Math.floor(Math.random() * size);
@@ -28,7 +27,6 @@ function createBoard(size, mineCount) {
             plantedMines++;
         }
     }
-
     for (let r = 0; r < size; r++) {
         for (let c = 0; c < size; c++) {
             if (board[r][c].isMine) continue;
@@ -44,16 +42,14 @@ function createBoard(size, mineCount) {
     return board;
 }
 
-// --- GIAO DIỆN NÚT (Fix giới hạn 5 hàng) ---
+// --- GIAO DIỆN NÚT (4x4 để đủ 5 hàng) ---
 function createComponents(board, isGameOver = false, isWin = false, flagMode = false) {
     const rows = [];
-    // Bàn cờ 4x4 = 4 hàng
     for (let r = 0; r < board.length; r++) {
         const row = new ActionRowBuilder();
         for (let c = 0; c < board[r].length; c++) {
             const cell = board[r][c];
             const btn = new ButtonBuilder().setCustomId(`boom_${r}_${c}`);
-
             if (!cell.isOpen) {
                 btn.setLabel(cell.isFlagged ? "🚩" : "\u200b")
                    .setStyle(cell.isFlagged ? ButtonStyle.Warning : ButtonStyle.Secondary);
@@ -68,16 +64,13 @@ function createComponents(board, isGameOver = false, isWin = false, flagMode = f
         }
         rows.push(row);
     }
-
-    // Hàng thứ 5: Nút chuyển chế độ
-    const controlRow = new ActionRowBuilder().addComponents(
+    rows.push(new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId("boom_toggle_flag")
             .setLabel(flagMode ? "CHẾ ĐỘ: CẮM CỜ 🚩" : "CHẾ ĐỘ: MỞ Ô ⛏️")
             .setStyle(flagMode ? ButtonStyle.Warning : ButtonStyle.Success)
             .setDisabled(isGameOver || isWin)
-    );
-    rows.push(controlRow);
+    ));
     return rows;
 }
 
@@ -95,51 +88,38 @@ module.exports = {
     data: new SlashCommandBuilder()
         .setName("doboom")
         .setDescription("💣 Dò mìn - Thắng x5 tiền cược")
-        .addIntegerOption(opt => 
-            opt.setName("tiencuoc")
-               .setDescription("Số tiền đặt cược")
-               .setRequired(true)
-               .setMinValue(1000)
-        ),
+        .addIntegerOption(opt => opt.setName("tiencuoc").setDescription("Số tiền cược").setRequired(true).setMinValue(1000)),
 
     async execute(interaction) {
         try {
             const bet = interaction.options.getInteger("tiencuoc");
-            let user = await User.findOne({ userId: interaction.user.id });
+            const user = await User.findOne({ userId: interaction.user.id });
 
-            // Kiểm tra user, nếu không có thì tạo mới (tùy logic bot của bạn)
-            if (!user) {
-                return interaction.reply({ content: "❌ Bạn chưa có tài khoản trong hệ thống!", flags: 64 });
-            }
-
-            if (user.money < bet) {
-                return interaction.reply({ 
-                    content: `❌ Không đủ tiền! Ví: \`${user.money.toLocaleString()}\` VND`, 
-                    flags: 64 
-                });
+            if (!user || user.money < bet) {
+                return interaction.reply({ content: "❌ Bạn không đủ tiền!", flags: 64 });
             }
 
             user.money -= bet;
             await user.save();
 
-            // SỬA TẠI ĐÂY: Dùng bàn cờ 4x4 (Size 4) để không bị quá 5 hàng nút
-            let board = createBoard(4, 3); 
+            let board = createBoard(4, 3);
             let flagMode = false;
             let gameOver = false;
             let win = false;
 
             const embed = new EmbedBuilder()
-                .setTitle("💣 DÒ MÌN - KHỞI NGHIỆP")
-                .setDescription(`💰 Cược: **${bet.toLocaleString()}** | Thắng: **${(bet * 5).toLocaleString()}**\nTrạng thái: Đang dò...`)
+                .setTitle("💣 DÒ MÌN - CASINO")
+                .setDescription(`💰 Cược: **${bet.toLocaleString()}** | Thắng: **${(bet * 5).toLocaleString()}**`)
                 .setColor(0x2f3136);
 
-            const response = await interaction.reply({
+            // SỬA LỖI TẠI ĐÂY: Dùng fetchReply để lấy tin nhắn chính xác
+            await interaction.reply({
                 embeds: [embed],
-                components: createComponents(board, false, false, flagMode),
-                withResponse: true
+                components: createComponents(board, false, false, flagMode)
             });
 
-            const collector = (response.resource || response).createMessageComponentCollector({
+            const message = await interaction.fetchReply();
+            const collector = message.createMessageComponentCollector({
                 componentType: ComponentType.Button,
                 time: 120000
             });
@@ -185,7 +165,7 @@ module.exports = {
                     finalDesc = `🏆 **THẮNG LỚN!** Bạn nhận được \`${prize.toLocaleString()}\` VND!`;
                     embed.setColor(0x00ff00);
                 } else {
-                    finalDesc = "⏰ Trận đấu kết thúc do quá lâu không tương tác.";
+                    finalDesc = "⏰ Hết thời gian.";
                 }
 
                 embed.setDescription(`💰 Cược: **${bet.toLocaleString()}**\n\n${finalDesc}`);
@@ -197,11 +177,7 @@ module.exports = {
 
         } catch (error) {
             console.error("LỖI DÒ MÌN:", error);
-            if (interaction.replied || interaction.deferred) {
-                await interaction.followUp({ content: "Có lỗi xảy ra khi xử lý game!", flags: 64 });
-            } else {
-                await interaction.reply({ content: "Có lỗi xảy ra khi thực hiện lệnh!", flags: 64 });
-            }
+            if (!interaction.replied) await interaction.reply({ content: "Lỗi hệ thống!", flags: 64 });
         }
     }
 };
