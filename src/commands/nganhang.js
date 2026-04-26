@@ -25,8 +25,8 @@ module.exports = {
             const ms = Date.now() - new Date(user.lastDepositAt).getTime();
             const hours = ms / (1000 * 60 * 60);
             if (hours >= 1) {
-                // Công thức lãi kép: Gốc * (1 + r)^n - Gốc (r = 0.3% = 0.003)
-                interest = Math.floor(user.bankMoney * (Math.pow(1.003, Math.floor(hours)) - 1));
+                // Công thức lãi kép: Gốc * (1 + r)^n - Gốc (r = 0.8% = 0.008)
+                interest = Math.floor(user.bankMoney * (Math.pow(1.008, Math.floor(hours)) - 1));
             }
         }
 
@@ -115,7 +115,7 @@ module.exports = {
             if (user.bankMoney > 0 && user.lastDepositAt) {
                 const hours = (Date.now() - new Date(user.lastDepositAt).getTime()) / (1000 * 60 * 60);
                 if (hours >= 1) {
-                    const interest = Math.floor(user.bankMoney * (Math.pow(1.003, Math.floor(hours)) - 1));
+                    const interest = Math.floor(user.bankMoney * (Math.pow(1.008, Math.floor(hours)) - 1));
                     user.bankMoney += interest;
                 }
             }
