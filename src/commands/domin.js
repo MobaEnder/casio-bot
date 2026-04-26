@@ -1,7 +1,14 @@
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require("discord.js");
-const User = require("../models/User"); // Đảm bảo đường dẫn tới model User chính xác
+const { 
+    SlashCommandBuilder, 
+    EmbedBuilder, 
+    ActionRowBuilder, 
+    ButtonBuilder, 
+    ButtonStyle, 
+    ComponentType 
+} = require("discord.js");
+const User = require("../models/User"); // Thay đổi đường dẫn này cho đúng với project của bạn
 
-// --- LOGIC KHỞI TẠO BÀN CỜ (Giữ nguyên) ---
+// --- LOGIC KHỞI TẠO BÀN CỜ ---
 function createBoard(size, mineCount) {
     const board = Array.from({ length: size }, () =>
         Array.from({ length: size }, () => ({
@@ -11,6 +18,7 @@ function createBoard(size, mineCount) {
             isFlagged: false
         }))
     );
+
     let plantedMines = 0;
     while (plantedMines < mineCount) {
         const r = Math.floor(Math.random() * size);
@@ -20,6 +28,7 @@ function createBoard(size, mineCount) {
             plantedMines++;
         }
     }
+
     for (let r = 0; r < size; r++) {
         for (let c = 0; c < size; c++) {
             if (board[r][c].isMine) continue;
@@ -35,6 +44,7 @@ function createBoard(size, mineCount) {
     return board;
 }
 
+// --- HÀM TẠO GIAO DIỆN NÚT BẤM (Fix lỗi Label) ---
 function createComponents(board, isGameOver = false, isWin = false, flagMode = false) {
     const rows = [];
     for (let r = 0; r < board.length; r++) {
@@ -42,19 +52,28 @@ function createComponents(board, isGameOver = false, isWin = false, flagMode = f
         for (let c = 0; c < board[r].length; c++) {
             const cell = board[r][c];
             const btn = new ButtonBuilder().setCustomId(`boom_${r}_${c}`);
+
+            // Discord yêu cầu label không được để trống "", dùng "\u200b" để tạo khoảng trắng tàng hình
             if (!cell.isOpen) {
-                btn.setLabel(cell.isFlagged ? "🚩" : " ").setStyle(cell.isFlagged ? ButtonStyle.Warning : ButtonStyle.Secondary);
+                btn.setLabel(cell.isFlagged ? "🚩" : "\u200b")
+                   .setStyle(cell.isFlagged ? ButtonStyle.Warning : ButtonStyle.Secondary);
+                
                 if (isGameOver || isWin) btn.setDisabled(true);
                 if (isGameOver && cell.isMine) btn.setLabel("💥").setStyle(ButtonStyle.Danger);
             } else {
-                btn.setLabel(cell.isMine ? "💥" : (cell.count > 0 ? cell.count.toString() : " "))
-                   .setStyle(cell.isMine ? ButtonStyle.Danger : ButtonStyle.Primary)
-                   .setDisabled(true);
+                if (cell.isMine) {
+                    btn.setLabel("💥").setStyle(ButtonStyle.Danger).setDisabled(true);
+                } else {
+                    const label = cell.count > 0 ? cell.count.toString() : "\u200b";
+                    btn.setLabel(label).setStyle(ButtonStyle.Primary).setDisabled(true);
+                }
             }
             row.addComponents(btn);
         }
         rows.push(row);
     }
+
+    // Nút điều khiển chế độ
     rows.push(new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId("boom_toggle_flag")
@@ -65,6 +84,7 @@ function createComponents(board, isGameOver = false, isWin = false, flagMode = f
     return rows;
 }
 
+// --- LOGIC LOANG (MỞ Ô TRỐNG) ---
 function reveal(board, r, c) {
     if (!board[r] || !board[r][c] || board[r][c].isOpen || board[r][c].isFlagged) return;
     board[r][c].isOpen = true;
@@ -78,10 +98,10 @@ function reveal(board, r, c) {
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("doboom")
-        .setDescription("💣 Game Dò Mìn - Thắng x5 tiền cược")
+        .setDescription("💣 Dò mìn thử thách - Thắng x5 tiền cược")
         .addIntegerOption(opt => 
             opt.setName("tiencuoc")
-               .setDescription("Số tiền bạn muốn đặt cược")
+               .setDescription("Số tiền đặt cược")
                .setRequired(true)
                .setMinValue(1000)
         ),
@@ -90,41 +110,40 @@ module.exports = {
         const bet = interaction.options.getInteger("tiencuoc");
         const user = await User.findOne({ userId: interaction.user.id });
 
-        // 1. Kiểm tra tiền túi
         if (!user || user.money < bet) {
-            return interaction.reply({ content: `❌ Bạn không đủ tiền! Ví hiện tại: \`${(user?.money || 0).toLocaleString()} VND\``, flags: 64 });
+            return interaction.reply({ 
+                content: `❌ Bạn không đủ tiền! Ví: \`${(user?.money || 0).toLocaleString()}\` VND`, 
+                flags: 64 
+            });
         }
 
-        // 2. Trừ tiền cược ngay lập tức
+        // Tạm thu tiền cược
         user.money -= bet;
         await user.save();
 
-        const size = 5;
-        const mineCount = 4;
-        let board = createBoard(size, mineCount);
+        let board = createBoard(5, 4); // Bàn 5x5, 4 quả mìn
         let flagMode = false;
         let gameOver = false;
         let win = false;
 
         const embed = new EmbedBuilder()
-            .setTitle("💣 DÒ MÌN - KHỞI NGHIỆP")
-            .setDescription(`💰 Tiền cược: **${bet.toLocaleString()} VND**\n💎 Thắng nhận: **${(bet * 5).toLocaleString()} VND** (x5)`)
-            .setColor(0x2f3136)
-            .setFooter({ text: "Nhấn nút dưới để chuyển chế độ Cắm Cờ 🚩" });
+            .setTitle("💣 DÒ MÌN - CASINO EDITION")
+            .setDescription(`💰 Cược: **${bet.toLocaleString()}** | 🎁 Thắng nhận: **${(bet * 5).toLocaleString()}**\n\nHãy cẩn thận với những quả mìn ẩn giấu!`)
+            .setColor(0x2f3136);
 
-        const msg = await interaction.reply({
+        // Sử dụng withResponse để tránh Warning fetchReply
+        const response = await interaction.reply({
             embeds: [embed],
             components: createComponents(board, false, false, flagMode),
-            fetchReply: true
+            withResponse: true
         });
 
-        const collector = msg.createMessageComponentCollector({
-            componentType: ComponentType.Button,
-            time: 120000 // Tăng lên 2 phút cho thoải mái
-        });
+        const collector = response.resource 
+            ? response.resource.createMessageComponentCollector({ componentType: ComponentType.Button, time: 120000 })
+            : response.createMessageComponentCollector({ componentType: ComponentType.Button, time: 120000 });
 
         collector.on("collect", async (i) => {
-            if (i.user.id !== interaction.user.id) return i.reply({ content: "Trận này không phải của bạn!", flags: 64 });
+            if (i.user.id !== interaction.user.id) return i.reply({ content: "Không phải lượt của bạn!", flags: 64 });
 
             if (i.customId === "boom_toggle_flag") {
                 flagMode = !flagMode;
@@ -137,14 +156,13 @@ module.exports = {
             if (flagMode) {
                 if (!cell.isOpen) cell.isFlagged = !cell.isFlagged;
             } else {
-                if (cell.isFlagged) return i.reply({ content: "Hãy bỏ cờ 🚩 trước khi mở!", flags: 64 });
+                if (cell.isFlagged) return i.reply({ content: "Gỡ cờ trước khi mở!", flags: 64 });
                 if (cell.isMine) {
                     gameOver = true;
                     return collector.stop("mine");
-                } 
+                }
                 reveal(board, r, c);
-                const unOpenedNonMines = board.flat().filter(cell => !cell.isMine && !cell.isOpen).length;
-                if (unOpenedNonMines === 0) {
+                if (board.flat().filter(cell => !cell.isMine && !cell.isOpen).length === 0) {
                     win = true;
                     return collector.stop("win");
                 }
@@ -152,22 +170,20 @@ module.exports = {
             await i.update({ components: createComponents(board, false, false, flagMode) });
         });
 
-        collector.on("end", async (collected, reason) => {
+        collector.on("end", async (_, reason) => {
             let finalMsg = "";
             if (reason === "mine") {
-                finalMsg = `💥 **GAME OVER!** Bạn đạp mìn và mất \`${bet.toLocaleString()} VND\`.`;
+                finalMsg = `💥 **GAME OVER!** Bạn mất \`${bet.toLocaleString()}\` VND.`;
                 embed.setColor(0xff0000);
             } else if (reason === "win") {
                 const prize = bet * 5;
-                // CỘNG THƯỞNG X5
                 const winner = await User.findOne({ userId: interaction.user.id });
                 winner.money += prize;
                 await winner.save();
-
-                finalMsg = `🏆 **VICTORY!** Bạn đã thắng và nhận được \`${prize.toLocaleString()} VND\`!`;
+                finalMsg = `🏆 **THẮNG LỚN!** Bạn nhận được \`${prize.toLocaleString()}\` VND!`;
                 embed.setColor(0x00ff00);
             } else {
-                finalMsg = "⏰ Trận đấu kết thúc do quá thời gian.";
+                finalMsg = "⏰ Hết thời gian tương tác.";
             }
 
             await interaction.editReply({
