@@ -13,7 +13,7 @@ const User = require("../models/User");
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("nganhang")
-        .setDescription("🏦 Ngân hàng Trung ương - Lãi suất 0.3%/giờ"),
+        .setDescription("🏦 Ngân hàng Trung ương - Lãi suất 0.8%/giờ"),
 
     async execute(interaction) {
         let user = await User.findOne({ userId: interaction.user.id });
@@ -136,7 +136,7 @@ module.exports = {
             let interest = 0;
             const hours = (Date.now() - new Date(user.lastDepositAt).getTime()) / (1000 * 60 * 60);
             if (hours >= 1) {
-                interest = Math.floor(user.bankMoney * (Math.pow(1.003, Math.floor(hours)) - 1));
+                interest = Math.floor(user.bankMoney * (Math.pow(1.008, Math.floor(hours)) - 1));
             }
 
             const isAll = (amount >= user.bankMoney);
