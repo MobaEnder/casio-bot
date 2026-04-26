@@ -1,11 +1,12 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
-const User = require("../models/User"); 
+const User = require("../models/User");
 
+// --- HỆ THỐNG DỮ LIỆU TẦNG ---
 function getFloorData(floor) {
     let reqDps, reward;
     if (floor <= 20) {
-        reqDps = 100 + (floor * 95); 
-        reward = 10 + (floor * 24); 
+        reqDps = 100 + (floor * 95);
+        reward = 10 + (floor * 24);
     } else if (floor <= 70) {
         reqDps = 2000 + ((floor - 20) * 960);
         reward = 500 + ((floor - 20) * 90);
@@ -31,11 +32,11 @@ module.exports = {
     data: new SlashCommandBuilder()
         .setName("leothap")
         .setDescription("🏰 Đưa thẻ bài từ túi đồ đi chinh phục Tháp Vô Tận")
-        .addIntegerOption(opt => 
+        .addIntegerOption(opt =>
             opt.setName("vitri")
-               .setDescription("Số thứ tự thẻ trong túi đồ")
-               .setRequired(true)
-               .setMinValue(1)
+                .setDescription("Số thứ tự thẻ trong túi đồ")
+                .setRequired(true)
+                .setMinValue(1)
         ),
 
     async execute(interaction) {
@@ -47,63 +48,43 @@ module.exports = {
 
             const userDB = await User.findOne({ userId: userId });
             if (!userDB) return interaction.editReply("❌ Không tìm thấy dữ liệu người chơi!");
+            if (userDB.towerAttempts <= 0) return interaction.editReply("❌ Bạn đã hết lượt leo tháp hôm nay.");
 
-            if (userDB.towerAttempts <= 0) {
-                return interaction.editReply("❌ Bạn đã hết lượt leo tháp hôm nay.");
-            }
-
-            // Đổi từ inventory sang cards cho đồng bộ database của bạn
-            const userCards = userDB.cards || userDB.inventory; 
-            
+            const userCards = userDB.cards || userDB.inventory;
             if (!userCards || userCards.length < slot) {
-                return interaction.editReply(`❌ Không tìm thấy thẻ ở vị trí số **${slot}** trong bộ sưu tập.`);
+                return interaction.editReply(`❌ Không tìm thấy thẻ ở vị trí số **${slot}**.`);
             }
 
-            const card = userCards[slot - 1]; 
-            
-            // Fix lỗi undefined/NaN cho stats
-            const cardLevel = card.level || card.lv || 1;
-            const baseDamage = card.atk || card.baseDamage || 100;
-            const critRate = card.critRate || 0;
-            const critDmg = card.critDmg || card.critDamage || 0;
+            const card = userCards[slot - 1];
 
-            // Lấy buffRate từ DB (mặc định là 0 nếu không có bùa)
-            const buffRate = userDB.buffs?.towerDpsBoost || 0;
-
-            // Tính toán DPS
-            const card = userCards[slot - 1]; 
-
-            // --- ĐOẠN FIX: ĐỒNG BỘ CÔNG THỨC VỚI TÚI ĐỒ ---
-            const level = card.level || 1;
-            
-            // 1. Tính base (Giống hệt hàm calculateDPS bạn gửi)
-            const base = ((card.hp || 0) * 0.1) + 
-                         ((card.atk || 0) * 2) + 
-                         ((card.def || 0) * 1.5) + 
-                         ((card.mdef || 0) * 1.5) + 
+            // --- ĐỒNG BỘ CÔNG THỨC DPS VỚI TÚI ĐỒ ---
+            const level = card.level || card.lv || 1;
+            const base = ((card.hp || 0) * 0.1) +
+                         ((card.atk || 0) * 2) +
+                         ((card.def || 0) * 1.5) +
+                         ((card.mdef || 0) * 1.5) +
                          ((card.spd || 0) * 5);
 
-            // 2. Tính offensive
             const offensive = ((card.atkSpd || 0) * 100) * (1 + ((card.critRate || 0) / 100) * ((card.critDmg || 0) / 100));
 
-            // 3. Tính DPS tổng theo Level (5% mỗi cấp)
+            // Tính DPS gốc
             let dps = Math.floor((base + offensive) * (1 + (level - 1) * 0.05));
 
-            // 4. Áp dụng Buff bùa (nếu có)
+            // Áp dụng bùa từ DB
             const buffRate = userDB.buffs?.towerDpsBoost || 0;
             dps = Math.floor(dps * (1 + buffRate));
-            // --- HẾT ĐOẠN FIX ---
 
+            // --- LOGIC LEO THÁP ---
             let currentFloor = userDB.towerFloor || 1;
-            let startFloor = currentFloor;
+            const startFloor = currentFloor;
             let totalRewards = 0;
+            let stopReason = "Thẻ của bạn không đủ sức mạnh để vượt qua tầng này.";
 
-            // Vòng lặp leo tháp
             while (currentFloor <= 150) {
                 const floorData = getFloorData(currentFloor);
 
+                // Sự kiện Boss mỗi 10 tầng
                 if (currentFloor % 10 === 0) {
-                    bossEncountered = true;
                     if (dps < floorData.reqDps * 2 && Math.random() < 0.10) {
                         currentFloor = Math.max(1, currentFloor - 1);
                         stopReason = "💀 **BOSS APPEARED!** Bạn đã bị Boss đánh bật lùi lại 1 tầng!";
@@ -114,59 +95,57 @@ module.exports = {
                 if (dps >= floorData.reqDps) {
                     totalRewards += floorData.reward;
                     currentFloor++;
-                    
-                    // Logic tăng EXP và Level
-                    card.exp = (card.exp || 0) + 10; 
-                    let expNeeded = cardLevel * 100;
-                    if (card.exp >= expNeeded) {
+
+                    // Tăng EXP và Level cho thẻ
+                    card.exp = (card.exp || 0) + 10;
+                    if (card.exp >= (level * 100)) {
                         card.exp = 0;
-                        if (card.level) card.level++; else card.lv = (card.lv || 1) + 1;
+                        if (card.level) card.level++; else if (card.lv) card.lv++;
                     }
                 } else {
                     break;
                 }
             }
 
-            // Cập nhật Database
+            // --- CẬP NHẬT DATABASE ---
             userDB.towerAttempts -= 1;
             userDB.money += totalRewards;
             userDB.towerFloor = currentFloor;
-            
-            // QUAN TRỌNG: Phải markModified đúng tên mảng dữ liệu (cards hoặc inventory)
-            userDB.markModified('cards'); 
-            userDB.markModified('inventory'); 
+
+            userDB.markModified('cards');
+            userDB.markModified('inventory');
             await userDB.save();
 
-            const isMaxFloor = currentFloor > 150;
-            const finalFloor = isMaxFloor ? 150 : currentFloor;
+            const finalFloor = currentFloor > 150 ? 150 : currentFloor;
 
+            // --- HIỂN THỊ ---
             const embed = new EmbedBuilder()
                 .setTitle(`🏰 THÁP VÔ TẬN - TẦNG ${finalFloor}`)
-                .setColor(0x2ecc71) 
+                .setColor(0x2ecc71)
                 .setThumbnail(card.imageUrl || null)
                 .addFields(
-                    { 
-                        name: "🎴 Thẻ Sử Dụng", 
-                        value: `**Tên:** ${card.name}\n**Level:** ${card.level || card.lv || 1}\n⚔️ **DPS Tổng:** \`${dps.toLocaleString()}\``, 
-                        inline: false 
+                    {
+                        name: "🎴 Thẻ Sử Dụng",
+                        value: `**Tên:** ${card.name}\n**Level:** ${card.level || card.lv || 1}\n⚔️ **DPS Tổng:** \`${dps.toLocaleString()}\``,
+                        inline: false
                     },
-                    { 
-                        name: "🧗 Tiến Trình Leo", 
-                        value: `🚩 **Bắt đầu từ:** Tầng ${startFloor}\n🛑 **Dừng lại tại:** Tầng ${finalFloor}\n🎯 **Yêu cầu DPS hiện tại:** \`${getFloorData(finalFloor).reqDps.toLocaleString()}\``, 
-                        inline: true 
+                    {
+                        name: "🧗 Tiến Trình Leo",
+                        value: `🚩 **Bắt đầu từ:** Tầng ${startFloor}\n🛑 **Dừng lại tại:** Tầng ${finalFloor}\n🎯 **Yêu cầu DPS hiện tại:** \`${getFloorData(finalFloor).reqDps.toLocaleString()}\``,
+                        inline: true
                     },
-                    { 
-                        name: "🎁 Phần Thưởng", 
-                        value: `💰 Tích lũy: **+${totalRewards.toLocaleString()}** VND\n⚡ Lượt còn lại: **${userDB.towerAttempts}**`, 
-                        inline: true 
+                    {
+                        name: "🎁 Phần Thưởng",
+                        value: `💰 Tích lũy: **+${totalRewards.toLocaleString()}** VND\n⚡ Lượt còn lại: **${userDB.towerAttempts}**`,
+                        inline: true
                     },
-                    { 
-                        name: "📊 Tỉ lệ hoàn thành Tháp (Max: 150)", 
-                        value: `${createProgressBar(finalFloor, 150)}`, 
-                        inline: false 
+                    {
+                        name: "📊 Tỉ lệ hoàn thành Tháp (Max: 150)",
+                        value: `${createProgressBar(finalFloor, 150)}`,
+                        inline: false
                     }
                 )
-                .setFooter({ text: isMaxFloor ? "👑 Chúc mừng! Bạn đã chinh phục đỉnh tháp!" : stopReason });
+                .setFooter({ text: currentFloor > 150 ? "👑 Chúc mừng! Bạn đã chinh phục đỉnh tháp!" : stopReason });
 
             await interaction.editReply({ embeds: [embed] });
 
