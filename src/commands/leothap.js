@@ -39,33 +39,40 @@ module.exports = {
                .setMinValue(1)
         ),
 
+    // ... (đoạn trên giữ nguyên)
+
     async execute(interaction) {
-        await interaction.deferReply(); 
+        await interaction.deferReply();
 
         try {
             const slot = interaction.options.getInteger("vitri");
-            const userDB = await User.findOne({ userId: interaction.user.id });
+            const userId = interaction.user.id;
 
+            const userDB = await User.findOne({ userId: userId });
             if (!userDB) return interaction.editReply("❌ Không tìm thấy dữ liệu người chơi!");
 
-            // Kiểm tra lượt đi (towerAttempts)
             if (userDB.towerAttempts <= 0) {
-                return interaction.editReply("❌ Bạn đã hết lượt leo tháp hôm nay. Hãy quay lại vào ngày mai hoặc mua thêm lượt!");
+                return interaction.editReply("❌ Bạn đã hết lượt leo tháp hôm nay.");
             }
 
-            const userInv = userDB.inventory; 
-            if (!userInv || userInv.length < slot) {
-                return interaction.editReply(`❌ Không tìm thấy thẻ ở vị trí số **${slot}** trong túi đồ của bạn.`);
-            }
-
-            const card = userInv[slot - 1];
+            // --- SỬA TẠI ĐÂY: Đổi inventory thành cards ---
+            const userCards = userDB.cards; 
             
-            // Tích hợp Bùa Buff từ User Model (nếu có)
-            const buffRate = userDB.buffs?.towerDpsBoost || 0;
+            if (!userCards || userCards.length < slot) {
+                return interaction.editReply(`❌ Không tìm thấy thẻ ở vị trí số **${slot}** trong bộ sưu tập thẻ bài của bạn.`);
+            }
 
-            // Tính toán DPS gốc (Nếu level bị undefined sẽ mặc định là 1 để tránh lỗi hiển thị)
-            const cardLevel = card.level || card.lv; 
-            let dps = Math.floor((card.baseDamage * (cardLevel || 1)) + (card.critRate * card.critDamage));
+            const card = userCards[slot - 1]; 
+            
+            // Tính toán DPS (Đảm bảo thẻ của bạn có các trường stats này)
+            // Nếu thẻ chưa có level hoặc stats, hãy thêm mặc định để tránh lỗi NaN
+            const cardLevel = card.level || 1;
+            const baseDamage = card.atk || 100; // Đổi theo tên field trong cards của bạn
+            const critRate = card.critRate || 0;
+            const critDmg = card.critDmg || 0;
+
+            const dps = Math.floor((baseDamage * cardLevel) + (critRate * critDmg));
+
             
             // Áp dụng Buff
             dps = Math.floor(dps * (1 + buffRate));
