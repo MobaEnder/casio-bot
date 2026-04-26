@@ -8,7 +8,7 @@ const {
 } = require("discord.js");
 const User = require("../models/User");
 
-// --- LOGIC KHỞI TẠO BÀN CỜ ---
+// --- LOGIC KHỞI TẠO BÀN CỜ (4x4) ---
 function createBoard(size, mineCount) {
     const board = Array.from({ length: size }, () =>
         Array.from({ length: size }, () => ({
@@ -42,7 +42,7 @@ function createBoard(size, mineCount) {
     return board;
 }
 
-// --- GIAO DIỆN NÚT (4x4 để đủ 5 hàng) ---
+// --- GIAO DIỆN NÚT ---
 function createComponents(board, isGameOver = false, isWin = false, flagMode = false) {
     const rows = [];
     for (let r = 0; r < board.length; r++) {
@@ -99,6 +99,7 @@ module.exports = {
                 return interaction.reply({ content: "❌ Bạn không đủ tiền!", flags: 64 });
             }
 
+            // Trừ tiền cược
             user.money -= bet;
             await user.save();
 
@@ -112,24 +113,27 @@ module.exports = {
                 .setDescription(`💰 Cược: **${bet.toLocaleString()}** | Thắng: **${(bet * 5).toLocaleString()}**`)
                 .setColor(0x2f3136);
 
-            // SỬA LỖI TẠI ĐÂY: Dùng fetchReply để lấy tin nhắn chính xác
-            await interaction.reply({
+            // Gửi phản hồi và lấy ID tin nhắn
+            const message = await interaction.reply({
                 embeds: [embed],
-                components: createComponents(board, false, false, flagMode)
+                components: createComponents(board, false, false, flagMode),
+                fetchReply: true // Bắt buộc phải có để lấy đối tượng tin nhắn
             });
 
-            const message = await interaction.fetchReply();
-            const collector = message.createMessageComponentCollector({
+            // Sử dụng Collector từ Channel để tăng độ ổn định
+            const collector = interaction.channel.createMessageComponentCollector({
+                filter: (i) => i.message.id === message.id && i.user.id === interaction.user.id,
                 componentType: ComponentType.Button,
                 time: 120000
             });
 
             collector.on("collect", async (i) => {
-                if (i.user.id !== interaction.user.id) return i.reply({ content: "Không phải máy của bạn!", flags: 64 });
+                // Phải deferUpdate ngay để tránh lỗi "Interaction Failed"
+                await i.deferUpdate();
 
                 if (i.customId === "boom_toggle_flag") {
                     flagMode = !flagMode;
-                    return i.update({ components: createComponents(board, false, false, flagMode) });
+                    return interaction.editReply({ components: createComponents(board, false, false, flagMode) });
                 }
 
                 const [, r, c] = i.customId.split("_").map(Number);
@@ -138,7 +142,7 @@ module.exports = {
                 if (flagMode) {
                     if (!cell.isOpen) cell.isFlagged = !cell.isFlagged;
                 } else {
-                    if (cell.isFlagged) return i.reply({ content: "Gỡ cờ trước!", flags: 64 });
+                    if (cell.isFlagged) return; // Đã cắm cờ thì không cho mở
                     if (cell.isMine) {
                         gameOver = true;
                         return collector.stop("mine");
@@ -149,7 +153,8 @@ module.exports = {
                         return collector.stop("win");
                     }
                 }
-                await i.update({ components: createComponents(board, false, false, flagMode) });
+                
+                await interaction.editReply({ components: createComponents(board, false, false, flagMode) });
             });
 
             collector.on("end", async (_, reason) => {
@@ -177,7 +182,6 @@ module.exports = {
 
         } catch (error) {
             console.error("LỖI DÒ MÌN:", error);
-            if (!interaction.replied) await interaction.reply({ content: "Lỗi hệ thống!", flags: 64 });
         }
     }
 };
