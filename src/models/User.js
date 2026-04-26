@@ -45,6 +45,10 @@ const userSchema = new mongoose.Schema({
     */
   },
 
+  towerFloor: { type: Number, default: 1 }
+
+  towerAttempts: { type: Number, default: 3 }
+
   // 🛡️ Hệ thống Bảo vệ (Ăn trộm sẽ check cái này)
   // 0: Không bảo vệ, 1: Cấp thấp, 2: Cấp cao
   securityLevel: { type: Number, default: 0 },
