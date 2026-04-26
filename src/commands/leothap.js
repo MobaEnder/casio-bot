@@ -47,7 +47,7 @@ module.exports = {
             const userDB = await User.findOne({ userId: interaction.user.id });
 
             if (!userDB) return interaction.editReply("❌ Không tìm thấy dữ liệu!");
-            if (userDB.towerAttempts <= 0) return interaction.editReply("❌ Bạn đã hết lượt leo tháp hôm nay.");
+            if (userDB.towerAttempts <= 0) return interaction.editReply("❌ Bạn đã hết lượt leo tháp. Hãy vào `/shop` để mua thêm lượt!");
 
             const userCards = userDB.cards; 
             if (!userCards || userCards.length < slot) {
@@ -55,85 +55,83 @@ module.exports = {
             }
 
             let card = userCards[slot - 1]; 
-            
-            // Khởi tạo các giá trị nếu chưa có
             card.level = card.level || 1;
             card.exp = card.exp || 0;
 
-            // Tính DPS có cộng thêm chỉ số từ Level (Mỗi level tăng 2% sức mạnh tổng)
-            const baseDps = Math.floor((card.atk || 100) + (card.critRate || 0) * (card.critDmg || 0) / 100);
-            const dps = Math.floor(baseDps * (1 + (card.level - 1) * 0.02));
+            // --- [MỚI] TÍNH TOÁN DPS CÓ BUFF ---
+            const baseDpsRaw = Math.floor((card.atk || 100) + (card.critRate || 0) * (card.critDmg || 0) / 100);
+            const dpsLevelBonus = Math.floor(baseDpsRaw * (1 + (card.level - 1) * 0.02));
+            
+            // Lấy tỉ lệ buff từ shop (towerDpsBoost đã mua ở shop)
+            const towerBuffMultiplier = userDB.buffs?.towerDpsBoost || 0;
+            const finalDps = Math.floor(dpsLevelBonus * (1 + towerBuffMultiplier));
 
             let currentFloor = userDB.towerFloor || 1;
             let startFloor = currentFloor;
             let totalRewards = 0;
-            let totalExpGained = 0; // BIẾN TÍCH LŨY EXP
+            let totalExpGained = 0; 
             let stopReason = "Thẻ không đủ sức mạnh để vượt qua tầng tiếp theo.";
-            let bossEncountered = false;
 
             // --- VÒNG LẶP LEO THÁP ---
             while (currentFloor <= 150) {
                 const floorData = getFloorData(currentFloor);
 
                 if (currentFloor % 10 === 0) {
-                    bossEncountered = true;
-                    if (dps < floorData.reqDps * 1.5 && Math.random() < 0.15) {
+                    // Boss khó hơn 1.5 lần, nếu dps < dps yêu cầu * 1.5 thì có tỉ lệ bị đẩy lùi
+                    if (finalDps < floorData.reqDps * 1.5 && Math.random() < 0.15) {
                         currentFloor = Math.max(1, currentFloor - 1);
                         stopReason = "💀 **BOSS TRẤN GIỮ!** Bạn bị đánh bật lùi 1 tầng!";
                         break;
                     }
                 }
 
-                if (dps >= floorData.reqDps) {
+                if (finalDps >= floorData.reqDps) {
                     totalRewards += floorData.reward;
-                    totalExpGained += currentFloor * 5; // CÔNG THỨC EXP: Tầng càng cao EXP càng nhiều
+                    totalExpGained += currentFloor * 5;
                     currentFloor++;
                 } else {
                     break;
                 }
             }
 
-            // --- LOGIC LÊN CẤP (LEVEL UP) ---
+            // --- LOGIC LÊN CẤP ---
             let levelUpMsg = "";
             if (card.level < 100) {
                 card.exp += totalExpGained;
-                let neededExp = card.level * 1000; // Mỗi level cần Level * 1000 EXP
-
+                let neededExp = card.level * 1000;
                 while (card.exp >= neededExp && card.level < 100) {
                     card.exp -= neededExp;
                     card.level++;
                     neededExp = card.level * 1000;
                     levelUpMsg = `\n⭐ **LEVEL UP!** Thẻ đã đạt cấp **${card.level}**`;
                 }
-            } else {
-                card.exp = 0; // Max level không nhận thêm EXP
             }
 
             // Cập nhật Database
             userDB.towerAttempts -= 1;
             userDB.money += totalRewards;
             userDB.towerFloor = currentFloor;
-            userDB.markModified('cards'); // QUAN TRỌNG: Để Mongoose lưu thay đổi trong mảng
+            userDB.markModified('cards');
             await userDB.save();
 
             const finalFloor = Math.min(currentFloor, 150);
             const embed = new EmbedBuilder()
                 .setTitle(`🏰 KẾT QUẢ LEO THÁP - TẦNG ${finalFloor}`)
-                .setColor(0x3498db)
+                .setColor(towerBuffMultiplier > 0 ? 0xffcc00 : 0x3498db) // Đổi màu vàng nếu có buff
                 .addFields(
                     { 
                         name: "🎴 Thẻ Sử Dụng", 
-                        value: `**${card.name}**\nCấp: \`${card.level}/100\`\nSức mạnh: \`${dps.toLocaleString()}\``, 
+                        value: `**${card.name}** (Lv.${card.level})\n⚔️ Sức mạnh: \`${finalDps.toLocaleString()}\` ${towerBuffMultiplier > 0 ? `*(🔥 +${towerBuffMultiplier * 100}%)*` : ""}`, 
                         inline: false 
                     },
                     { 
                         name: "📊 Tiến Trình", 
-                        value: `Tiến lên: **${startFloor} ➔ ${finalFloor}**\nEXP nhận: \`+${totalExpGained.toLocaleString()}\`${levelUpMsg}`, 
+                        value: `Tiến lên: **${startFloor} ➔ ${finalFloor}**\nEXP: \`+${totalExpGained.toLocaleString()}\`${levelUpMsg}`, 
                         inline: true 
                     },
                     { 
                         name: "🎁 Phần Thưởng", 
-                        value: `💰: **+${totalRewards.toLocaleString()}** VND\n⚡ Lượt còn: **${userDB.towerAttempts}**`, 
+                        value: `💰: **+${totalRewards.toLocaleString()}** VND\n🎫 Lượt còn: **${userDB.towerAttempts}**`, 
                         inline: true 
                     },
                     { 

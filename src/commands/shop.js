@@ -31,11 +31,22 @@ const ITEMS = {
         { id: "c_shield_s", name: "🔰 Khiên Nhỏ (Giảm 20%)", price: 15000000, type: "charm", shield: 0.2, desc: "Giảm 20% tiền mất khi thua" },
         { id: "c_shield_m", name: "🔰 Khiên Vừa (Giảm 50%)", price: 100000000, type: "charm", shield: 0.5, desc: "Giảm 50% tiền mất khi thua" },
         { id: "c_shield_l", name: "🔰 Khiên To (Giảm 80%)", price: 400000000, type: "charm", shield: 0.8, desc: "Giảm 80% tiền mất khi thua" }
+    ],
+    tower: [
+        // Lượt đi tháp
+        { id: "tw_att_5", name: "🎫 5 Lượt Đi Tháp", price: 1000000, type: "tower_attempt", amount: 5, desc: "Cộng thêm 5 lượt leo tháp" },
+        { id: "tw_att_10", name: "🎫 10 Lượt Đi Tháp", price: 2000000, type: "tower_attempt", amount: 10, desc: "Cộng thêm 10 lượt leo tháp" },
+        { id: "tw_att_20", name: "🎫 20 Lượt Đi Tháp", price: 4000000, type: "tower_attempt", amount: 20, desc: "Cộng thêm 20 lượt leo tháp" },
+        { id: "tw_att_30", name: "🎫 30 Lượt Đi Tháp", price: 6000000, type: "tower_attempt", amount: 30, desc: "Cộng thêm 30 lượt leo tháp" },
+        // Buff lực chiến (DPS)
+        { id: "tw_buff_10", name: "🔥 Thẻ Buff Tháp (+10%)", price: 1000000, type: "tower_buff", boost: 0.10, desc: "Tăng 10% Lực chiến khi leo tháp" },
+        { id: "tw_buff_20", name: "🔥 Thẻ Buff Tháp (+20%)", price: 10000000, type: "tower_buff", boost: 0.20, desc: "Tăng 20% Lực chiến khi leo tháp" },
+        { id: "tw_buff_35", name: "🔥 Thẻ Buff Tháp (+35%)", price: 40000000, type: "tower_buff", boost: 0.35, desc: "Tăng 35% Lực chiến khi leo tháp" }
     ]
 };
 
 module.exports = {
-    data: new SlashCommandBuilder().setName("shop").setDescription("Mở cửa hàng vật phẩm Casino"),
+    data: new SlashCommandBuilder().setName("shop").setDescription("Mở cửa hàng vật phẩm Casino & Tháp"),
 
     async execute(interaction) {
         // 1. Giao diện chính
@@ -46,14 +57,16 @@ module.exports = {
             .addFields(
                 { name: "🎭 Danh Hiệu", value: "Thể hiện đẳng cấp của bạn.", inline: true },
                 { name: "🛡️ Bảo Vệ", value: "Chống trộm cắp tài sản.", inline: true },
-                { name: "🧿 Bùa Chú", value: "Tăng may mắn & giảm rủi ro.", inline: true }
+                { name: "🧿 Bùa Chú", value: "Tăng may mắn & giảm rủi ro.", inline: true },
+                { name: "🗼 Shop Tháp", value: "Lượt đi & Buff lực chiến.", inline: true }
             )
             .setFooter({ text: "Hệ thống sẽ tự đóng sau 60 giây không tương tác." });
 
         const categoryRow = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId("shop_titles").setLabel("Shop Danh Hiệu").setStyle(ButtonStyle.Primary).setEmoji("🎭"),
             new ButtonBuilder().setCustomId("shop_guards").setLabel("Shop Bảo Vệ").setStyle(ButtonStyle.Success).setEmoji("🛡️"),
-            new ButtonBuilder().setCustomId("shop_charms").setLabel("Shop Bùa Chú").setStyle(ButtonStyle.Secondary).setEmoji("🧿")
+            new ButtonBuilder().setCustomId("shop_charms").setLabel("Shop Bùa Chú").setStyle(ButtonStyle.Secondary).setEmoji("🧿"),
+            new ButtonBuilder().setCustomId("shop_tower").setLabel("Shop Tháp").setStyle(ButtonStyle.Danger).setEmoji("🗼")
         );
 
         const response = await interaction.reply({ 
@@ -93,7 +106,7 @@ module.exports = {
             // XỬ LÝ MUA VẬT PHẨM (Select Menu)
             if (i.isStringSelectMenu()) {
                 const itemId = i.values[0];
-                const allItems = [...ITEMS.titles, ...ITEMS.guards, ...ITEMS.charms];
+                const allItems = [...ITEMS.titles, ...ITEMS.guards, ...ITEMS.charms, ...ITEMS.tower];
                 const item = allItems.find(it => it.id === itemId);
 
                 let user = await User.findOne({ userId: i.user.id });
@@ -116,6 +129,7 @@ module.exports = {
                     successMsg = `Hệ thống bảo vệ đã được nâng cấp lên: **${item.name}**!`;
                 }
                 else if (item.type === "charm") {
+                    if (!user.buffs) user.buffs = {}; // Đảm bảo object buffs tồn tại
                     if (item.boost) {
                         user.buffs.winRateBoost = item.boost;
                         successMsg = `Đã kích hoạt **${item.name}**. Tỉ lệ thắng ván tới sẽ tăng thêm!`;
@@ -124,6 +138,17 @@ module.exports = {
                         user.buffs.shield = item.shield;
                         successMsg = `Đã kích hoạt **${item.name}**. Nếu thua ván tới sẽ được giảm lỗ!`;
                     }
+                }
+                else if (item.type === "tower_attempt") {
+                    user.towerAttempts = (user.towerAttempts || 0) + item.amount;
+                    successMsg = `Bạn vừa mua thành công **${item.amount} lượt leo tháp**. Tổng lượt hiện tại: **${user.towerAttempts}**!`;
+                }
+                else if (item.type === "tower_buff") {
+                    if (!user.buffs) user.buffs = {};
+                    // Nếu đã có buff cũ, ghi đè bằng buff mới mua
+                    user.buffs.towerDpsBoost = item.boost;
+                    user.markModified('buffs');
+                    successMsg = `Đã kích hoạt **${item.name}**. Lực chiến thẻ bài sẽ được buff khi bạn dùng lệnh /leothap!`;
                 }
 
                 user.money -= item.price;
