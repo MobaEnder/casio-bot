@@ -1,7 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const User = require("../models/User"); 
 
-// --- HỆ THỐNG TÍNH TOÁN THÁP (Giữ nguyên logic của bạn) ---
 function getFloorData(floor) {
     let reqDps, reward;
     if (floor <= 20) {
@@ -39,8 +38,6 @@ module.exports = {
                .setMinValue(1)
         ),
 
-    // ... (đoạn trên giữ nguyên)
-
     async execute(interaction) {
         await interaction.deferReply();
 
@@ -55,26 +52,26 @@ module.exports = {
                 return interaction.editReply("❌ Bạn đã hết lượt leo tháp hôm nay.");
             }
 
-            // --- SỬA TẠI ĐÂY: Đổi inventory thành cards ---
-            const userCards = userDB.cards; 
+            // Đổi từ inventory sang cards cho đồng bộ database của bạn
+            const userCards = userDB.cards || userDB.inventory; 
             
             if (!userCards || userCards.length < slot) {
-                return interaction.editReply(`❌ Không tìm thấy thẻ ở vị trí số **${slot}** trong bộ sưu tập thẻ bài của bạn.`);
+                return interaction.editReply(`❌ Không tìm thấy thẻ ở vị trí số **${slot}** trong bộ sưu tập.`);
             }
 
             const card = userCards[slot - 1]; 
             
-            // Tính toán DPS (Đảm bảo thẻ của bạn có các trường stats này)
-            // Nếu thẻ chưa có level hoặc stats, hãy thêm mặc định để tránh lỗi NaN
-            const cardLevel = card.level || 1;
-            const baseDamage = card.atk || 100; // Đổi theo tên field trong cards của bạn
+            // Fix lỗi undefined/NaN cho stats
+            const cardLevel = card.level || card.lv || 1;
+            const baseDamage = card.atk || card.baseDamage || 100;
             const critRate = card.critRate || 0;
-            const critDmg = card.critDmg || 0;
+            const critDmg = card.critDmg || card.critDamage || 0;
 
-            const dps = Math.floor((baseDamage * cardLevel) + (critRate * critDmg));
+            // Lấy buffRate từ DB (mặc định là 0 nếu không có bùa)
+            const buffRate = userDB.buffs?.towerDpsBoost || 0;
 
-            
-            // Áp dụng Buff
+            // Tính toán DPS
+            let dps = Math.floor((baseDamage * cardLevel) + (critRate * critDmg));
             dps = Math.floor(dps * (1 + buffRate));
 
             let currentFloor = userDB.towerFloor || 1;
@@ -91,7 +88,7 @@ module.exports = {
                     bossEncountered = true;
                     if (dps < floorData.reqDps * 2 && Math.random() < 0.10) {
                         currentFloor = Math.max(1, currentFloor - 1);
-                        stopReason = "💀 **BOSS APPEARED!** Bạn đã bị Boss đánh bật lùi lại 1 tầng do không kịp hạ gục nó trong 10 giây!";
+                        stopReason = "💀 **BOSS APPEARED!** Bạn đã bị Boss đánh bật lùi lại 1 tầng!";
                         break;
                     }
                 }
@@ -100,11 +97,12 @@ module.exports = {
                     totalRewards += floorData.reward;
                     currentFloor++;
                     
-                    // Tích hợp tăng level cho thẻ (Sau mỗi tầng thắng)
+                    // Logic tăng EXP và Level
                     card.exp = (card.exp || 0) + 10; 
-                    if (card.exp >= (cardLevel * 100)) {
+                    let expNeeded = cardLevel * 100;
+                    if (card.exp >= expNeeded) {
                         card.exp = 0;
-                        if (card.level) card.level++; else if (card.lv) card.lv++;
+                        if (card.level) card.level++; else card.lv = (card.lv || 1) + 1;
                     }
                 } else {
                     break;
@@ -115,21 +113,23 @@ module.exports = {
             userDB.towerAttempts -= 1;
             userDB.money += totalRewards;
             userDB.towerFloor = currentFloor;
-            userDB.markModified('inventory');
+            
+            // QUAN TRỌNG: Phải markModified đúng tên mảng dữ liệu (cards hoặc inventory)
+            userDB.markModified('cards'); 
+            userDB.markModified('inventory'); 
             await userDB.save();
 
             const isMaxFloor = currentFloor > 150;
             const finalFloor = isMaxFloor ? 150 : currentFloor;
 
-            // HIỂN THỊ Y HỆT THEO ẢNH MẪU
             const embed = new EmbedBuilder()
                 .setTitle(`🏰 THÁP VÔ TẬN - TẦNG ${finalFloor}`)
-                .setColor(0x2ecc71) // Màu xanh lá giống trong ảnh
-                .setThumbnail(card.imageUrl || "https://i.imgur.com/your-tower-icon.png")
+                .setColor(0x2ecc71) 
+                .setThumbnail(card.imageUrl || null)
                 .addFields(
                     { 
                         name: "🎴 Thẻ Sử Dụng", 
-                        value: `**Tên:** ${card.name}\n**Level:** ${cardLevel}\n⚔️ **DPS Tổng:** \`${dps.toLocaleString()}\``, 
+                        value: `**Tên:** ${card.name}\n**Level:** ${card.level || card.lv || 1}\n⚔️ **DPS Tổng:** \`${dps.toLocaleString()}\``, 
                         inline: false 
                     },
                     { 
@@ -153,7 +153,7 @@ module.exports = {
             await interaction.editReply({ embeds: [embed] });
 
         } catch (error) {
-            console.error(error);
+            console.error("LỖI LEO THÁP:", error);
             await interaction.editReply("❌ Đã xảy ra lỗi khi leo tháp.");
         }
     }
