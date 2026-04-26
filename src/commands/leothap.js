@@ -71,14 +71,32 @@ module.exports = {
             const buffRate = userDB.buffs?.towerDpsBoost || 0;
 
             // Tính toán DPS
-            let dps = Math.floor((baseDamage * cardLevel) + (critRate * critDmg));
+            const card = userCards[slot - 1]; 
+
+            // --- ĐOẠN FIX: ĐỒNG BỘ CÔNG THỨC VỚI TÚI ĐỒ ---
+            const level = card.level || 1;
+            
+            // 1. Tính base (Giống hệt hàm calculateDPS bạn gửi)
+            const base = ((card.hp || 0) * 0.1) + 
+                         ((card.atk || 0) * 2) + 
+                         ((card.def || 0) * 1.5) + 
+                         ((card.mdef || 0) * 1.5) + 
+                         ((card.spd || 0) * 5);
+
+            // 2. Tính offensive
+            const offensive = ((card.atkSpd || 0) * 100) * (1 + ((card.critRate || 0) / 100) * ((card.critDmg || 0) / 100));
+
+            // 3. Tính DPS tổng theo Level (5% mỗi cấp)
+            let dps = Math.floor((base + offensive) * (1 + (level - 1) * 0.05));
+
+            // 4. Áp dụng Buff bùa (nếu có)
+            const buffRate = userDB.buffs?.towerDpsBoost || 0;
             dps = Math.floor(dps * (1 + buffRate));
+            // --- HẾT ĐOẠN FIX ---
 
             let currentFloor = userDB.towerFloor || 1;
             let startFloor = currentFloor;
             let totalRewards = 0;
-            let stopReason = "Thẻ của bạn không đủ sức mạnh để vượt qua tầng này.";
-            let bossEncountered = false;
 
             // Vòng lặp leo tháp
             while (currentFloor <= 150) {
