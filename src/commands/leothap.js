@@ -3,20 +3,31 @@ const User = require("../models/User");
 
 // --- HỆ THỐNG DỮ LIỆU TẦNG ---
 function getFloorData(floor) {
-    let reqDps, reward;
+    let reqDps;
+    
+    // Giữ nguyên hệ thống yêu cầu DPS theo từng mốc
     if (floor <= 20) {
         reqDps = 100 + (floor * 95);
-        reward = 10 + (floor * 24);
     } else if (floor <= 70) {
         reqDps = 2000 + ((floor - 20) * 960);
-        reward = 500 + ((floor - 20) * 90);
     } else if (floor <= 120) {
         reqDps = 50000 + ((floor - 70) * 9000);
-        reward = 5000 + ((floor - 70) * 900);
     } else {
         reqDps = 500000 + ((floor - 120) * 50000);
-        reward = 50000 + ((floor - 120) * 5000);
     }
+
+    // --- LOGIC TIỀN THƯỞNG MỚI ---
+    // Tiền thưởng khởi điểm ở Tầng 1 (Bạn có thể tự đổi số 10 này thành số bạn muốn)
+    const baseReward = 10; 
+    
+    // Tính tiền thưởng: Tiền khởi điểm * 2^(Số tầng - 1)
+    let reward = baseReward * Math.pow(2, floor - 1);
+    
+    // Giới hạn tối đa 500.000.000 (500 triệu)
+    if (reward > 500000000) {
+        reward = 500000000;
+    }
+
     return { reqDps: Math.floor(reqDps), reward: Math.floor(reward) };
 }
 
