@@ -17,18 +17,16 @@ function getFloorData(floor) {
     }
 
     // --- LOGIC TIỀN THƯỞNG MỚI ---
-    // Tiền thưởng khởi điểm ở Tầng 1 (Bạn có thể tự đổi số 10 này thành số bạn muốn)
-    const baseReward = 10; 
-    
-    // Tính tiền thưởng: Tiền khởi điểm * 2^(Số tầng - 1)
-    let reward = baseReward * Math.pow(2, floor - 1);
-    
-    // Giới hạn tối đa 500.000.000 (500 triệu)
-    if (reward > 500000000) {
-        reward = 500000000;
+    let reward = 0;
+    if (floor <= 50) {
+        reward = 500000;       // Tầng 1 - 50: 500k mỗi tầng
+    } else if (floor <= 100) {
+        reward = 1000000;      // Tầng 51 - 100: 1tr mỗi tầng
+    } else {
+        reward = 3000000;      // Tầng 101 trở lên: 3tr mỗi tầng
     }
 
-    return { reqDps: Math.floor(reqDps), reward: Math.floor(reward) };
+    return { reqDps: Math.floor(reqDps), reward: reward };
 }
 
 function createProgressBar(currentFloor, maxFloor = 150, size = 15) {
