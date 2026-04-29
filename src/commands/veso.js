@@ -67,7 +67,7 @@ async function runLottery() {
     const resultEmbed = new EmbedBuilder()
         .setTitle("🎰 NHẬT KÝ QUAY THƯỞNG KỲ NÀY")
         .setColor(0xf1c40f)
-        .setThumbnail("https://i.imgur.com/your-lottery-icon.png") // Thay icon nếu muốn
+        .setThumbnail("https://baocantho.com.vn/image/fckeditor/upload/2025/20250901/images/t9-IMG_5393.webp") // Thay icon nếu muốn
         .addFields(
             { name: "💎 Giải Đặc Biệt", value: `\`${results.db[0]}\``, inline: false },
             { name: "🥇 Giải Nhất & Nhì", value: `G1: \`${results.g1[0]}\`\nG2: \`${results.g2[0]}\``, inline: true },
