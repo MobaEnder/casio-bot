@@ -14,14 +14,14 @@ const { checkCooldown } = require("./utils/cooldowns");
 
 // BỔ SUNG: Import Model User và hàm loanChecker
 const User = require("./models/User"); 
-const checkLoans = require("./utils/loanChecker"); // Đã sửa theo tên file trong ảnh của bạn
+const checkLoans = require("./utils/loanChecker");
 
 connectDB();
 
 // ===== CONFIG =====
 const TOKEN = process.env.BOT_TOKEN;
 const APP_ID = process.env.APP_ID;
-const DEV_GUILD_ID = process.env.DEV_GUILD_ID;
+// Đã loại bỏ DEV_GUILD_ID để bot chạy đa server
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds],
@@ -49,17 +49,19 @@ function loadFolder(folderPath) {
 loadFolder("commands");
 loadFolder("cogs");
 
-// ===== REGISTER SLASH COMMANDS =====
+// ===== REGISTER SLASH COMMANDS (NÂNG CẤP LÊN GLOBAL) =====
 const rest = new REST({ version: "10" }).setToken(TOKEN);
 (async () => {
   try {
-    if (DEV_GUILD_ID) {
-      await rest.put(Routes.applicationGuildCommands(APP_ID, DEV_GUILD_ID), { body: commands });
-    } else {
-      await rest.put(Routes.applicationCommands(APP_ID), { body: commands });
-    }
-    console.log("✅ Đã đăng ký Slash Commands");
-  } catch (e) { console.error(e); }
+    console.log("⏳ Đang đăng ký Slash Commands hệ thống (Global)...");
+    
+    // Đăng ký trực tiếp lên toàn cầu thay vì theo từng Guild
+    await rest.put(Routes.applicationCommands(APP_ID), { body: commands });
+    
+    console.log("✅ Đã đăng ký Slash Commands thành công trên toàn hệ thống!");
+  } catch (e) { 
+    console.error("❌ Lỗi khi đăng ký lệnh:", e); 
+  }
 })();
 
 // ===== INTERACTION HANDLER =====
@@ -70,7 +72,6 @@ client.on(Events.InteractionCreate, async interaction => {
     const isAnxaCommand = interaction.isChatInputCommand() && interaction.commandName === "anxa";
     const isAdmin = adminIds.includes(interaction.user.id);
 
-    // Nếu KHÔNG PHẢI lệnh anxa VÀ KHÔNG PHẢI admin thì mới check Ban
     if (!isAnxaCommand && !isAdmin) {
         const userDB = await User.findOne({ userId: interaction.user.id });
         if (userDB && userDB.banned) {
@@ -86,7 +87,6 @@ client.on(Events.InteractionCreate, async interaction => {
       const command = client.commands.get(interaction.commandName);
       if (!command) return;
 
-      // Check Cooldown (Cũng nên cho Admin vượt Cooldown nếu muốn)
       if (!isAdmin) {
           const cooldown = checkCooldown(interaction.user.id, interaction.commandName);
           if (cooldown) {
@@ -135,8 +135,6 @@ client.on(Events.InteractionCreate, async interaction => {
 // ===== KHỞI ĐỘNG BOT VÀ CHẠY VÒNG LẶP =====
 client.once(Events.ClientReady, c => {
     console.log(`🤖 Bot online: ${c.user.tag}`);
-
-    // Chạy vòng lặp kiểm tra nợ mỗi phút
     setInterval(() => {
         checkLoans(client);
     }, 60000); 
