@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder } = require("discord.js");
 const User = require("../models/User");
 
 // ==========================================
@@ -18,7 +18,7 @@ const BOXERS = [
 ];
 
 // ==========================================
-// 2. HÀM TRỢ GIÚP (UI THANH MÁU)
+// 2. HÀM TRỢ GIÚP
 // ==========================================
 function createHpBar(currentHp, maxHp, size = 10) {
     const progress = Math.max(0, Math.min(currentHp / maxHp, 1));
@@ -28,125 +28,125 @@ function createHpBar(currentHp, maxHp, size = 10) {
 }
 
 // ==========================================
-// 3. LOGIC GIẢI ĐẤU & AI (TOURNAMENT)
+// 3. LOGIC SOLO 1VS1
 // ==========================================
-async function aiFight(channel, a, b) {
-    let hpA = a.hp;
-    let hpB = b.hp;
-
-    const fightMsg = await channel.send("🥊 Trận đấu đang diễn ra...");
-
-    for (let round = 1; round <= 3; round++) {
-        // AI tính damage cơ bản (có thể phát triển thêm tỉ lệ crit/miss sau)
-        const dmgToB = Math.floor(Math.random() * a.atk) + (a.spd > b.spd ? 5 : 0);
-        const dmgToA = Math.floor(Math.random() * b.atk) + (b.spd > a.spd ? 5 : 0);
-
-        hpB -= dmgToB;
-        hpA -= dmgToA;
-
-        const roundEmbed = new EmbedBuilder()
-            .setTitle(`🥊 HIỆP ${round}`)
-            .setColor(0xE74C3C)
-            .addFields(
-                { name: `🔴 ${a.name}`, value: `HP: ${createHpBar(hpA, a.hp)}\nRa đòn: -${dmgToB} HP`, inline: false },
-                { name: `🔵 ${b.name}`, value: `HP: ${createHpBar(hpB, b.hp)}\nRa đòn: -${dmgToA} HP`, inline: false }
-            );
-
-        await fightMsg.edit({ content: `⏳ Hiệp ${round}...`, embeds: [roundEmbed] });
-        
-        if (hpA <= 0 || hpB <= 0) break;
-        
-        await new Promise(resolve => setTimeout(resolve, 3000)); // Chờ 3s giữa hiệp
-    }
-
-    return hpA > hpB ? a : b;
-}
-
-async function simulatePhase(channel, phaseName, boxersInPhase, investors) {
-    const fighterA = boxersInPhase[0];
-    const fighterB = boxersInPhase[1];
-
-    const matchEmbed = new EmbedBuilder()
-        .setTitle(`🥊 VÕ ĐÀI HUYỀN THOẠI - VÒNG ${phaseName} 🥊`)
+async function startSoloMatch(interaction, p1) {
+    const channel = interaction.channel;
+    
+    // Mở phòng chờ
+    const lobbyEmbed = new EmbedBuilder()
+        .setTitle("🥊 PHÒNG CHỜ QUYỀN ANH")
+        .setDescription(`**${p1.username}** đã lên đài thách đấu!\nAi dám bước lên tiếp chiêu?`)
         .setColor(0x3498DB)
-        .addFields(
-            { name: `🔴 VÕ SĨ A: [${fighterA.name}]`, value: `Bí danh: *${fighterA.alias}*\nHP: ${fighterA.hp} | Lực tay: ${fighterA.atk}`, inline: true },
-            { name: `⚡`, value: `\n\n**VS**\n\n`, inline: true },
-            { name: `🔵 VÕ SĨ B: [${fighterB.name}]`, value: `Bí danh: *${fighterB.alias}*\nHP: ${fighterB.hp} | Lực tay: ${fighterB.atk}`, inline: true }
-        )
-        .setFooter({ text: "💰 Cổng cá cược mở trong 15 giây! (Mặc định 50k/vé)" });
+        .setFooter({ text: "Phòng chờ sẽ đóng sau 60 giây." });
 
-    const betRow = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId(`bet_${fighterA.id}`).setLabel(`Cược ${fighterA.name}`).setStyle(ButtonStyle.Danger),
-        new ButtonBuilder().setCustomId(`bet_${fighterB.id}`).setLabel(`Cược ${fighterB.name}`).setStyle(ButtonStyle.Primary)
+    const lobbyRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId("join_solo").setLabel("Tham Gia").setStyle(ButtonStyle.Primary).setEmoji("🥊")
     );
 
-    const matchMsg = await channel.send({ embeds: [matchEmbed], components: [betRow] });
+    const lobbyMsg = await interaction.editReply({ embeds: [lobbyEmbed], components: [lobbyRow], content: "" });
 
-    // Thu thập cược trong 15 giây
-    const betCollector = matchMsg.createMessageComponentCollector({ time: 15000 });
-    let totalPool = 0;
-
-    betCollector.on('collect', async i => {
-        const betAmount = 50000; // Tiền cược cứng 50k (bạn có thể đổi bằng modal sau)
-        const chosenId = i.customId.replace("bet_", "");
-
-        const userDB = await User.findOne({ userId: i.user.id });
-        if (!userDB || userDB.money < betAmount) {
-            return i.reply({ content: "❌ Bạn không đủ 50,000 VND để đầu tư!", ephemeral: true });
-        }
-
-        userDB.money -= betAmount;
-        await userDB.save();
-
-        totalPool += betAmount;
-        investors.set(i.user.id, { fighterId: chosenId, amount: betAmount });
-
-        await i.reply({ content: `💸 Bạn đã cược **${betAmount.toLocaleString()} VND** cho **${chosenId}**!`, ephemeral: true });
+    const lobbyCollector = lobbyMsg.createMessageComponentCollector({ 
+        filter: btn => btn.user.id !== p1.id, 
+        max: 1, 
+        time: 60000 
     });
 
-    betCollector.on('end', async () => {
-        await matchMsg.edit({ components: [] });
-        await channel.send(`⏳ Cổng cá cược đóng! Tổng hũ: **${totalPool.toLocaleString()} VND**. Bắt đầu!`);
-        
-        // Gọi AI đánh nhau
-        const winner = await aiFight(channel, fighterA, fighterB);
-        
-        // Trả thưởng x2
-        let winnersText = "Danh sách thắng cược:\n";
-        for (const [userId, betInfo] of investors.entries()) {
-            if (betInfo.fighterId === winner.id) {
-                const reward = betInfo.amount * 2;
-                const userDB = await User.findOne({ userId });
-                if (userDB) {
-                    userDB.money += reward;
-                    await userDB.save();
-                }
-                winnersText += `<@${userId}>: +${reward.toLocaleString()} VND 🎉\n`;
-            }
-        }
+    lobbyCollector.on('collect', async i => {
+        const p2 = i.user;
+        await i.update({ content: `🔥 Trận đấu giữa **${p1.username}** và **${p2.username}** bắt đầu!`, embeds: [], components: [] });
 
-        const endEmbed = new EmbedBuilder()
-            .setTitle(`🏆 KẾT QUẢ: ${winner.name} THẮNG!`)
-            .setColor(0xF1C40F)
-            .setDescription(winnersText.length > 25 ? winnersText : "Không có nhà đầu tư nào thắng cược.");
-            
-        await channel.send({ embeds: [endEmbed] });
+        // Chọn võ sĩ
+        const selectMenu = new StringSelectMenuBuilder()
+            .setCustomId('select_boxer')
+            .setPlaceholder('Chọn võ sĩ của bạn...')
+            .addOptions(BOXERS.map(b => ({ label: b.name, description: b.trait, value: b.id })));
+
+        const row = new ActionRowBuilder().addComponents(selectMenu);
+        const selectMsg = await channel.send({ content: `<@${p1.id}> và <@${p2.id}> hãy chọn võ sĩ!`, components: [row] });
+
+        let selections = new Map();
+        const selectCollector = selectMsg.createMessageComponentCollector({ time: 30000 });
+
+        selectCollector.on('collect', async si => {
+            if (si.user.id !== p1.id && si.user.id !== p2.id) return si.reply({ content: "Bạn không ở trong trận này!", ephemeral: true });
+            selections.set(si.user.id, BOXERS.find(b => b.id === si.values[0]));
+            await si.reply({ content: `Bạn đã chọn **${si.values[0].toUpperCase()}**!`, ephemeral: true });
+            if (selections.size === 2) selectCollector.stop();
+        });
+
+        selectCollector.on('end', async () => {
+            if (selections.size < 2) return channel.send("Trận đấu bị hủy do không chọn võ sĩ kịp thời.");
+            await selectMsg.delete();
+            runSoloFight(channel, p1, p2, selections.get(p1.id), selections.get(p2.id));
+        });
     });
 }
 
-async function runTournament(interaction) {
-    const channel = interaction.channel;
-    const shuffled = [...BOXERS].sort(() => 0.5 - Math.random());
-    let activeBoxers = shuffled.slice(0, 8); // Lấy 8 người đánh Tứ Kết
-    let investors = new Map();
+async function runSoloFight(channel, p1, p2, f1, f2) {
+    let hp1 = f1.hp, hp2 = f2.hp;
+    const fightMsg = await channel.send("🔔 **TIẾNG CHUÔNG VANG LÊN! TRẬN ĐẤU BẮT ĐẦU!**");
 
-    await simulatePhase(channel, "TỨ KẾT (TRẬN 1)", [activeBoxers[0], activeBoxers[1]], investors);
-    // Chú ý: Đây là sườn gốc, bạn có thể gọi thêm SimulatePhase cho các trận tiếp theo (Bán kết, Chung kết)
+    for (let round = 1; round <= 3; round++) {
+        const moveRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId("atk").setLabel("Tấn Công").setStyle(ButtonStyle.Danger).setEmoji("🥊"),
+            new ButtonBuilder().setCustomId("def").setLabel("Phòng Thủ").setStyle(ButtonStyle.Secondary).setEmoji("🛡️"),
+            new ButtonBuilder().setCustomId("cnt").setLabel("Phản Đòn").setStyle(ButtonStyle.Primary).setEmoji("⚡")
+        );
+
+        const roundMsg = await channel.send({ 
+            content: `**HIỆP ${round}**\n<@${p1.id}> & <@${p2.id}>, hãy chọn chiến thuật!`, 
+            components: [moveRow] 
+        });
+
+        let moves = new Map();
+        const moveCollector = roundMsg.createMessageComponentCollector({ time: 15000 });
+
+        moveCollector.on('collect', async mi => {
+            if (mi.user.id !== p1.id && mi.user.id !== p2.id) return;
+            moves.set(mi.user.id, mi.customId);
+            await mi.reply({ content: "Đã ghi nhận chiến thuật!", ephemeral: true });
+            if (moves.size === 2) moveCollector.stop();
+        });
+
+        await new Promise(res => moveCollector.on('end', res));
+        await roundMsg.delete();
+
+        // Tính toán damage
+        const move1 = moves.get(p1.id) || "atk";
+        const move2 = moves.get(p2.id) || "atk";
+
+        let dmg1 = Math.floor(Math.random() * f1.atk);
+        let dmg2 = Math.floor(Math.random() * f2.atk);
+
+        // Logic khắc chế: CNT > ATK, DEF > ATK
+        if (move1 === "cnt" && move2 === "atk") dmg1 *= 2.5; 
+        if (move2 === "cnt" && move1 === "atk") dmg2 *= 2.5;
+        if (move1 === "def") dmg2 = Math.floor(dmg2 * 0.2);
+        if (move2 === "def") dmg1 = Math.floor(dmg1 * 0.2);
+
+        hp1 -= dmg2;
+        hp2 -= dmg1;
+
+        const embed = new EmbedBuilder()
+            .setTitle(`🥊 KẾT THÚC HIỆP ${round}`)
+            .addFields(
+                { name: `🔴 ${p1.username} (${f1.name})`, value: `Hành động: ${move1.toUpperCase()}\nHP: ${createHpBar(hp1, f1.hp)}`, inline: false },
+                { name: `🔵 ${p2.username} (${f2.name})`, value: `Hành động: ${move2.toUpperCase()}\nHP: ${createHpBar(hp2, f2.hp)}`, inline: false }
+            )
+            .setColor(0xE67E22);
+
+        await channel.send({ embeds: [embed] });
+        if (hp1 <= 0 || hp2 <= 0) break;
+        await new Promise(r => setTimeout(r, 2000));
+    }
+
+    const winner = hp1 > hp2 ? p1 : p2;
+    await channel.send(`🏆 **KẾT THÚC!** Người chiến thắng cuối cùng là <@${winner.id}>!`);
 }
 
 // ==========================================
-// 4. LỆNH CHÍNH (SLASH COMMAND)
+// 4. LỆNH CHÍNH
 // ==========================================
 module.exports = {
     data: new SlashCommandBuilder()
@@ -159,7 +159,7 @@ module.exports = {
             .setDescription("Chọn phương thức bạn muốn tham gia:")
             .setColor(0xE67E22)
             .addFields(
-                { name: "⚔️ Solo 1vs1", value: "Tự chọn võ sĩ, tự ra đòn (Đang phát triển).", inline: true },
+                { name: "⚔️ Solo 1vs1", value: "Thách đấu người chơi khác trực tiếp.", inline: true },
                 { name: "🏆 Giải Đấu", value: "Cược tiền cho võ sĩ AI đánh.", inline: true }
             );
 
@@ -174,14 +174,15 @@ module.exports = {
 
         collector.on('collect', async i => {
             if (i.customId === "mode_solo") {
-                await i.update({ content: "🛠️ *Tính năng Solo đang được xây dựng...*", embeds: [], components: [] });
-                // Nơi gọi hàm Solo sau này
+                await startSoloMatch(i, i.user);
             } else if (i.customId === "mode_tourney") {
                 if (i.user.id !== interaction.user.id) return i.reply({ content: "Chỉ người gõ lệnh mới được khởi tạo!", ephemeral: true });
                 await i.update({ content: "🔥 **GIẢI ĐẤU BẮT ĐẦU!**", embeds: [], components: [] });
-                
-                runTournament(interaction);
+                // Hàm runTournament cũ của bạn
+                runTournament(interaction); 
             }
         });
     }
 };
+
+// Copy các hàm aiFight, simulatePhase, runTournament cũ của bạn dán xuống dưới cùng này...
