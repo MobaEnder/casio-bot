@@ -50,7 +50,7 @@ module.exports = async function checkLoans(client) {
                     await userUpdate.save();
 
                     // Thông báo thu hồi nợ thành công
-                    const channel = await client.channels.fetch("1492024555168989235").catch(() => null);
+                    const channel = await client.channels.fetch("1525757131717083268").catch(() => null);
                     if (channel) {
                         channel.send(`🔔 **THU HỒI NỢ TỰ ĐỘNG**\n> 👤 Con nợ: <@${user.userId}>\n> 💰 Chủ nợ: <@${lenderId}>\n> 💸 Số tiền: **${debtAmount.toLocaleString()} VND**\n*Hệ thống đã tự động trừ tiền từ tài khoản/ngân hàng để hoàn tất khoản vay.*`);
                     }
@@ -66,7 +66,7 @@ module.exports = async function checkLoans(client) {
                     await userUpdate.save();
 
                     // Thông báo Ban
-                    const channel = await client.channels.fetch("1492024555168989235").catch(() => null);
+                    const channel = await client.channels.fetch("1525757131717083268").catch(() => null);
                     if (channel) {
                         channel.send(`💀 **SIẾT NỢ THẤT BẠI**\n> ❌ Con nợ <@${user.userId}> không đủ tiền trả cho <@${lenderId}> (Số nợ: ${debtAmount.toLocaleString()} VND).\n> 🔨 Hình phạt: **BAN VĨNH VIỄN**.`);
                     }
