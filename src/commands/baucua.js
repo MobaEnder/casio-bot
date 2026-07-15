@@ -60,11 +60,11 @@ module.exports = {
             new ButtonBuilder().setCustomId("baucua_tom").setLabel("🦐 Tôm").setStyle(ButtonStyle.Success)
         );
 
-        const msg = await interaction.reply({
+        await interaction.reply({
             embeds: [embed],
             components: [row1, row2],
-            fetchReply: true,
         });
+        const msg = await interaction.fetchReply();
 
         games.set(msg.id, {
             bets: new Map(), // userId -> { face, amount }
@@ -73,8 +73,10 @@ module.exports = {
 
         // ⏳ Kết thúc sau 30s
         setTimeout(async () => {
+          try {
             const game = games.get(msg.id);
             if (!game) return;
+            game.locked = true; // Khóa bàn khi bắt đầu xử lý kết quả
 
             let rolls = [];
             const betFaces = Array.from(new Set(Array.from(game.bets.values()).map(b => b.face)));
@@ -160,12 +162,23 @@ module.exports = {
                 .setFooter({ text: "Hệ thống đã tự động áp dụng Bùa/Khiên nếu bạn có!" })
                 .setTimestamp();
 
-            await msg.edit({
-                embeds: [resultEmbed],
-                components: [],
-            });
-
+            // editReply qua webhook để tránh lỗi ChannelNotCached làm sập bot
+            try {
+                await interaction.editReply({ embeds: [resultEmbed], components: [] });
+            } catch (editErr) {
+                try {
+                    const channel = await interaction.client.channels.fetch(interaction.channelId);
+                    const m = await channel.messages.fetch(msg.id);
+                    await m.edit({ embeds: [resultEmbed], components: [] });
+                } catch (e2) {
+                    console.error("❌ [baucua] Không thể cập nhật kết quả:", e2.message);
+                }
+            }
+          } catch (err) {
+            console.error("❌ [baucua] Lỗi khi xử lý kết quả:", err);
+          } finally {
             games.delete(msg.id);
+          }
         }, 30000);
     },
 
@@ -195,7 +208,9 @@ module.exports = {
         const amount = parseInt(interaction.fields.getTextInputValue("bet_amount"));
         const game = games.get(interaction.message.id);
 
-        if (!game) return interaction.reply({ content: "❌ Bàn đã kết thúc!", flags: 64 });
+        if (!game || game.locked || Date.now() >= game.endsAt) {
+            return interaction.reply({ content: "❌ Bàn đã kết thúc! Tiền của bạn KHÔNG bị trừ.", flags: 64 });
+        }
         if (isNaN(amount) || amount < 1000) return interaction.reply({ content: "❌ Tiền cược không hợp lệ!", flags: 64 });
 
         let user = await User.findOne({ userId: interaction.user.id });

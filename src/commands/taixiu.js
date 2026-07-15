@@ -39,7 +39,8 @@ module.exports = {
             new ButtonBuilder().setCustomId("taixiu_xiu").setLabel("XỈU ❄️").setStyle(ButtonStyle.Primary)
         );
 
-        const response = await interaction.reply({ embeds: [embed], components: [row], fetchReply: true });
+        await interaction.reply({ embeds: [embed], components: [row]});
+        const response = await interaction.fetchReply();
 
         games.set(response.id, {
             bets: new Map(),
@@ -48,8 +49,10 @@ module.exports = {
         });
 
         setTimeout(async () => {
+          try {
             const game = games.get(response.id);
             if (!game) return;
+            game.locked = true; // Khóa bàn: không nhận cược mới trong lúc xử lý kết quả
 
             // ================= LÕI HỆ THỐNG NHÀ CÁI BỊP =================
             // 1. Tính tổng tiền cược của 2 bên
@@ -151,8 +154,24 @@ module.exports = {
                 .setFooter({ text: "Thắng làm vua, thua đi /work tiếp" })
                 .setTimestamp();
 
-            await response.edit({ embeds: [resultEmbed], components: [] });
+            // Dùng editReply (qua webhook, không phụ thuộc cache channel) để tránh lỗi ChannelNotCached
+            try {
+                await interaction.editReply({ embeds: [resultEmbed], components: [] });
+            } catch (editErr) {
+                // Fallback: fetch lại channel + message từ API rồi edit
+                try {
+                    const channel = await interaction.client.channels.fetch(interaction.channelId);
+                    const msg = await channel.messages.fetch(response.id);
+                    await msg.edit({ embeds: [resultEmbed], components: [] });
+                } catch (e2) {
+                    console.error("❌ [taixiu] Không thể cập nhật kết quả:", e2.message);
+                }
+            }
+          } catch (err) {
+            console.error("❌ [taixiu] Lỗi khi xử lý kết quả:", err);
+          } finally {
             games.delete(response.id);
+          }
         }, 20000);
     },
 
@@ -183,10 +202,13 @@ module.exports = {
         const amount = parseInt(interaction.fields.getTextInputValue("bet_amount"));
         const game = games.get(interaction.message.id);
 
-        if (!game) return interaction.reply({ content: "❌ Bàn đã kết thúc trong lúc bạn đang nhập tiền!", flags: 64 });
+        if (!game || game.locked || Date.now() >= game.endsAt) {
+            return interaction.reply({ content: "❌ Bàn đã kết thúc trong lúc bạn đang nhập tiền! Tiền của bạn KHÔNG bị trừ.", flags: 64 });
+        }
         if (isNaN(amount) || amount < 1000) return interaction.reply({ content: "❌ Tiền cược tối thiểu là 1,000 VND!", flags: 64 });
 
         const user = await User.findOne({ userId: interaction.user.id });
+        if (!user) return interaction.reply({ content: "❌ Bạn chưa có tài khoản! Hãy dùng /daily hoặc /work để khởi tạo.", flags: 64 });
         if (user.money < amount) return interaction.reply({ content: "❌ Bạn không đủ tiền, đừng có 'tay không bắt giặc'!", flags: 64 });
         if (user.banned) return interaction.reply({ content: "🚫 Bạn bị cấm cược!", flags: 64 });
 

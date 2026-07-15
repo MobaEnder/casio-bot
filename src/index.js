@@ -18,6 +18,16 @@ const checkLoans = require("./utils/loanChecker");
 
 connectDB();
 
+// ===== LƯỚI AN TOÀN TOÀN CỤC: CHỐNG CRASH =====
+// Bắt mọi Promise bị reject mà không có .catch (VD: lỗi trong setTimeout của các game)
+// Nếu không có 2 handler này, 1 lỗi nhỏ như ChannelNotCached sẽ làm SẬP CẢ BOT (exit code 1)
+process.on("unhandledRejection", (reason) => {
+  console.error("⚠️ [Unhandled Rejection]:", reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("⚠️ [Uncaught Exception]:", err);
+});
+
 // ===== CONFIG =====
 const TOKEN = process.env.BOT_TOKEN;
 const APP_ID = process.env.APP_ID;

@@ -55,7 +55,7 @@ function startTimer() {
     const scheduleNext = () => {
         const now = new Date();
         const msToNext = (30 - (now.getMinutes() % 30)) * 60000 - now.getSeconds() * 1000 - now.getMilliseconds();
-        setTimeout(async () => { await runLottery(); scheduleNext(); }, msToNext || 1800000);
+        setTimeout(async () => { try { await runLottery(); } catch (e) { console.error("[veso] Lỗi quay số:", e); } scheduleNext(); }, msToNext || 1800000);
     };
     scheduleNext();
 }
