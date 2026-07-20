@@ -1,6 +1,5 @@
 const {
     SlashCommandBuilder,
-    EmbedBuilder,
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
@@ -9,195 +8,209 @@ const {
     TextInputStyle,
 } = require("discord.js");
 const User = require("../models/User");
+const { COLORS, money, vnd, countdown, casinoEmbed, safeEdit, sleep } = require("../utils/ui");
+const JackpotPool = require("../utils/jackpotPool");
 
-const games = new Map(); // messageId -> game data
+const games = new Map();
+const BET_TIME = 30000;
+const LIVE_UPDATE_MS = 5000;
 
-const EMOJIS = {
-    nai: "🦌",
-    bau: "🎃",
-    ga: "🐔",
-    ca: "🐟",
-    cua: "🦀",
-    tom: "🦐",
-};
-
+const EMOJIS = { bau: "🎃", cua: "🦀", tom: "🦐", ca: "🐟", ga: "🐓", nai: "🦌" };
+const NAMES = { bau: "Bầu", cua: "Cua", tom: "Tôm", ca: "Cá", ga: "Gà", nai: "Nai" };
 const FACES = Object.keys(EMOJIS);
+
+// ---------- VẼ BÀN CƯỢC LIVE ----------
+function renderLobby(game) {
+    const totals = {};
+    const counts = {};
+    for (const f of FACES) { totals[f] = 0; counts[f] = 0; }
+    for (const bet of game.bets.values()) {
+        totals[bet.face] += bet.amount;
+        counts[bet.face]++;
+    }
+    const pot = Object.values(totals).reduce((a, b) => a + b, 0);
+
+    const embed = casinoEmbed({
+        color: COLORS.green,
+        title: "🎃🦀🦐 SÒNG BẦU CUA TÔM CÁ 🐟🐓🦌",
+    })
+        .setDescription(
+            `> 🎯 Trúng 1 mặt ăn **x2**, trúng 2 mặt **x3**, trúng cả 3 **x4**!\n\n` +
+            `⏳ **Xóc đĩa ${countdown(game.endsAt)}** — ${countdown(game.endsAt, "T")}\n` +
+            `💰 **Tổng hũ:** ${vnd(pot)} • 🎫 **${game.bets.size}** vé cược`
+        );
+
+    for (const f of FACES) {
+        embed.addFields({
+            name: `${EMOJIS[f]} ${NAMES[f].toUpperCase()}`,
+            value: `💵 \`${money(totals[f])}\`\n👥 ${counts[f]} người`,
+            inline: true,
+        });
+    }
+    return embed.setFooter({ text: "💡 Bấm nút chọn linh vật để xuống tiền!" });
+}
+
+function lobbyButtons(disabled = false) {
+    const row1 = new ActionRowBuilder().addComponents(
+        ...["bau", "cua", "tom"].map((f) =>
+            new ButtonBuilder().setCustomId(`baucua_${f}`).setLabel(NAMES[f]).setEmoji(EMOJIS[f]).setStyle(ButtonStyle.Success).setDisabled(disabled)
+        )
+    );
+    const row2 = new ActionRowBuilder().addComponents(
+        ...["ca", "ga", "nai"].map((f) =>
+            new ButtonBuilder().setCustomId(`baucua_${f}`).setLabel(NAMES[f]).setEmoji(EMOJIS[f]).setStyle(ButtonStyle.Primary).setDisabled(disabled)
+        )
+    );
+    return [row1, row2];
+}
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("baucua")
-        .setDescription("🎲 Tạo sòng Bầu Cua - Tỉ lệ 50/50 hên xui!"),
+        .setDescription("🎃 Mở sòng Bầu Cua Tôm Cá - Xóc đĩa online"),
 
     async execute(interaction) {
         const user = await User.findOne({ userId: interaction.user.id });
-
         if (user?.banned) {
-            return interaction.reply({
-                content: "⛔ Bạn đã bị cấm vĩnh viễn khỏi hệ thống cược do nợ nần ngập đầu!",
-                flags: 64,
-            });
+            return interaction.reply({ content: "⛔ Bạn đang bị phong tỏa tài sản!", flags: 64 });
         }
 
-        const embed = new EmbedBuilder()
-            .setColor(0xff8800)
-            .setTitle("🎲 SÒNG BẦU CUA ĐANG MỞ")
-            .setDescription(
-                "👉 Chọn **Nai, Bầu, Gà, Cá, Cua hoặc Tôm** để xuống tiền!\n" +
-                "⏳ Nhà cái sẽ xóc lọ sau **30 giây**..."
-            )
-            .setFooter({ text: "Nhà cái uy tín 50/50 💎" })
-            .setTimestamp();
+        const endsAt = Date.now() + BET_TIME;
+        const gameData = { bets: new Map(), endsAt, locked: false };
 
-        const row1 = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId("baucua_nai").setLabel("🦌 Nai").setStyle(ButtonStyle.Primary),
-            new ButtonBuilder().setCustomId("baucua_bau").setLabel("🎃 Bầu").setStyle(ButtonStyle.Primary),
-            new ButtonBuilder().setCustomId("baucua_ga").setLabel("🐔 Gà").setStyle(ButtonStyle.Primary)
-        );
-
-        const row2 = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId("baucua_ca").setLabel("🐟 Cá").setStyle(ButtonStyle.Success),
-            new ButtonBuilder().setCustomId("baucua_cua").setLabel("🦀 Cua").setStyle(ButtonStyle.Success),
-            new ButtonBuilder().setCustomId("baucua_tom").setLabel("🦐 Tôm").setStyle(ButtonStyle.Success)
-        );
-
-        await interaction.reply({
-            embeds: [embed],
-            components: [row1, row2],
-        });
+        await interaction.reply({ embeds: [renderLobby(gameData)], components: lobbyButtons() });
         const msg = await interaction.fetchReply();
+        games.set(msg.id, gameData);
 
-        games.set(msg.id, {
-            bets: new Map(), // userId -> { face, amount }
-            endsAt: Date.now() + 30000,
-        });
+        // 🔄 Cập nhật bàn cược live
+        const liveInterval = setInterval(async () => {
+            const g = games.get(msg.id);
+            if (!g || g.locked) return clearInterval(liveInterval);
+            await safeEdit(interaction, { embeds: [renderLobby(g)] }, msg.id);
+        }, LIVE_UPDATE_MS);
 
-        // ⏳ Kết thúc sau 30s
         setTimeout(async () => {
           try {
+            clearInterval(liveInterval);
             const game = games.get(msg.id);
             if (!game) return;
-            game.locked = true; // Khóa bàn khi bắt đầu xử lý kết quả
+            game.locked = true;
 
+            // ---------- LÕI KẾT QUẢ (giữ logic né mặt được cược nhiều) ----------
             let rolls = [];
-            const betFaces = Array.from(new Set(Array.from(game.bets.values()).map(b => b.face)));
+            const betFaces = Array.from(new Set(Array.from(game.bets.values()).map((b) => b.face)));
 
-            // 🎲 LOGIC CHÍNH XÁC 50/50
-            if (betFaces.length === 0 || betFaces.length === FACES.length) {
-                rolls = Array.from({ length: 3 }, () => FACES[Math.floor(Math.random() * FACES.length)]);
-            } else {
-                const isWin = Math.random() < 0.50; 
-                if (isWin) {
-                    const winningFace = betFaces[Math.floor(Math.random() * betFaces.length)];
-                    rolls.push(winningFace); 
-                    rolls.push(FACES[Math.floor(Math.random() * FACES.length)]);
-                    rolls.push(FACES[Math.floor(Math.random() * FACES.length)]);
-                    rolls.sort(() => Math.random() - 0.5); 
+            for (let i = 0; i < 3; i++) {
+                let face;
+                if (betFaces.length > 0 && Math.random() < 0.6) {
+                    const nonBet = FACES.filter((f) => !betFaces.includes(f));
+                    face = nonBet.length > 0
+                        ? nonBet[Math.floor(Math.random() * nonBet.length)]
+                        : FACES[Math.floor(Math.random() * FACES.length)];
                 } else {
-                    const loseFaces = FACES.filter(f => !betFaces.includes(f));
-                    rolls = Array.from({ length: 3 }, () => loseFaces[Math.floor(Math.random() * loseFaces.length)]);
+                    face = FACES[Math.floor(Math.random() * FACES.length)];
                 }
+                rolls.push(face);
             }
 
-            const counts = {};
-            for (const r of rolls) counts[r] = (counts[r] || 0) + 1;
+            // ---------- 🎬 ANIMATION XÓC ĐĨA ----------
+            const shakeFrames = [
+                "```\n   ╭─────────────╮\n   │  🥣 ⚡ 🍽️  │\n   │ ĐANG XÓC ĐĨA │\n   ╰─────────────╯```",
+                "```\n   ╭─────────────╮\n   │  💨 🌀 💨  │\n   │  XÓC MẠNH!! │\n   ╰─────────────╯```",
+                `\`\`\`\n   ╭─────────────╮\n   │  ${EMOJIS[rolls[0]]} ❓ ❓  │\n   │  MỞ BÁT.... │\n   ╰─────────────╯\`\`\``,
+                `\`\`\`\n   ╭─────────────╮\n   │  ${EMOJIS[rolls[0]]} ${EMOJIS[rolls[1]]} ❓  │\n   │ CON CUỐI LÀ? │\n   ╰─────────────╯\`\`\``,
+            ];
+            for (const frame of shakeFrames) {
+                await safeEdit(interaction, {
+                    embeds: [casinoEmbed({ color: COLORS.orange, title: "🥣 NHÀ CÁI ĐANG XÓC ĐĨA...", description: frame })],
+                    components: lobbyButtons(true),
+                }, msg.id);
+                await sleep(1200);
+            }
 
-            let winners = [];
-            let losers = [];
-
+            // ---------- TRẢ THƯỞNG ----------
+            let winners = [], losers = [];
             for (const [userId, bet] of game.bets.entries()) {
-                let uData = await User.findOne({ userId });
+                const uData = await User.findOne({ userId });
                 if (!uData) continue;
-
-                const hit = counts[bet.face] || 0;
                 let usedBuffs = [];
 
-                if (hit > 0) {
-                    // --- XỬ LÝ THẮNG ---
+                const hits = rolls.filter((r) => r === bet.face).length;
+
+                if (hits > 0) {
                     if (uData.buffs?.winRateBoost > 0) {
-                        usedBuffs.push(`🍀 Luck ${uData.buffs.winRateBoost * 100}%`);
-                        uData.buffs.winRateBoost = 0; // Sử dụng xong reset
-                    }
-                    
-                    const winAmount = bet.amount * (hit + 1); 
-                    const pureProfit = bet.amount * hit;
-
-                    uData.money += winAmount;
-                    uData.stats.win++;
-                    winners.push(`✅ <@${userId}> (+\`${pureProfit.toLocaleString()}\`)${usedBuffs.length ? ` [${usedBuffs.join(", ")}]` : ""} [${EMOJIS[bet.face]} x${hit}]`);
-                } else {
-                    // --- XỬ LÝ THUA ---
-                    let displayLoss = bet.amount;
-
-                    // Kiểm tra Khiên bảo vệ
-                    if (uData.buffs?.shield > 0) {
-                        const refund = Math.floor(bet.amount * uData.buffs.shield);
-                        uData.money += refund; // Hoàn trả một phần tiền
-                        displayLoss -= refund;
-                        usedBuffs.push(`🔰 Khiên ${uData.buffs.shield * 100}%`);
-                        uData.buffs.shield = 0; // Sử dụng xong reset
-                    }
-
-                    // Nếu có bùa Luck mà vẫn thua thì cũng reset bùa
-                    if (uData.buffs?.winRateBoost > 0) {
-                        usedBuffs.push(`🍀 Luck ${uData.buffs.winRateBoost * 100}%`);
+                        usedBuffs.push(`🍀${uData.buffs.winRateBoost * 100}%`);
                         uData.buffs.winRateBoost = 0;
                     }
-
+                    const winAmt = bet.amount * (hits + 1);
+                    uData.money += winAmt;
+                    uData.stats.win++;
+                    winners.push(`> 💸 <@${userId}> ${EMOJIS[bet.face]} x${hits} → **+${money(winAmt - bet.amount)}**${usedBuffs.length ? " " + usedBuffs.join(" ") : ""}`);
+                } else {
+                    let lossAmount = bet.amount;
+                    if (uData.buffs?.shield > 0) {
+                        const reducedLoss = bet.amount * (1 - uData.buffs.shield);
+                        uData.money += Math.floor(bet.amount - reducedLoss);
+                        lossAmount = Math.floor(reducedLoss);
+                        usedBuffs.push(`🔰${uData.buffs.shield * 100}%`);
+                        uData.buffs.shield = 0;
+                    }
+                    if (uData.buffs?.winRateBoost > 0) {
+                        usedBuffs.push("🍀 mất bùa");
+                        uData.buffs.winRateBoost = 0;
+                    }
                     uData.stats.lose++;
-                    losers.push(`❌ <@${userId}> (-\`${displayLoss.toLocaleString()}\`)${usedBuffs.length ? ` [${usedBuffs.join(", ")}]` : ""} [${EMOJIS[bet.face]}]`);
+                    losers.push(`> 🕳️ <@${userId}> ${EMOJIS[bet.face]} trượt → **-${money(lossAmount)}**${usedBuffs.length ? " " + usedBuffs.join(" ") : ""}`);
                 }
-
                 uData.stats.gamblePlayed++;
                 await uData.save();
+                if (rolls.filter((r) => r === bet.face).length === 0) JackpotPool.contribute(bet.amount);
+                JackpotPool.tryExplode(interaction.client, interaction.channelId, userId);
             }
 
-            const resultEmbed = new EmbedBuilder()
-                .setColor(0x00ff99)
-                .setTitle("🎉 KẾT QUẢ BẦU CUA")
+            // ---------- 🏆 KẾT QUẢ VIP ----------
+            const resultEmbed = casinoEmbed({
+                color: COLORS.gold,
+                title: "🎉 MỞ BÁT — KẾT QUẢ BẦU CUA 🎉",
+            })
                 .setDescription(
-                    `🎲 Xúc xắc: **${rolls.map(r => EMOJIS[r]).join(" - ")}**\n\n` +
-                    `🏆 **Người thắng:**\n${winners.join("\n") || "Không ai ăn được nhà cái 😢"}\n\n` +
-                    `💀 **Người thua:**\n${losers.join("\n") || "Không ai 😎"}`
+                    `# ${rolls.map((r) => EMOJIS[r]).join(" ")}\n` +
+                    `## ${rolls.map((r) => `**${NAMES[r]}**`).join(" • ")}\n` +
+                    `${"─".repeat(25)}\n` +
+                    `🏆 **NGƯỜI THẮNG (${winners.length})**\n${winners.slice(0, 8).join("\n") || "> 😢 Không ai ăn được nhà cái!"}` +
+                    (winners.length > 8 ? `\n> *...và ${winners.length - 8} người khác*` : "") +
+                    `\n\n💀 **NGƯỜI THUA (${losers.length})**\n${losers.slice(0, 8).join("\n") || "> 😎 Không ai mất xu nào!"}` +
+                    (losers.length > 8 ? `\n> *...và ${losers.length - 8} người khác*` : "")
                 )
-                .setFooter({ text: "Hệ thống đã tự động áp dụng Bùa/Khiên nếu bạn có!" })
-                .setTimestamp();
+                .setFooter({ text: "🎃 Bùa/Khiên tự động áp dụng • Gõ /baucua để chơi tiếp!" });
 
-            // editReply qua webhook để tránh lỗi ChannelNotCached làm sập bot
-            try {
-                await interaction.editReply({ embeds: [resultEmbed], components: [] });
-            } catch (editErr) {
-                try {
-                    const channel = await interaction.client.channels.fetch(interaction.channelId);
-                    const m = await channel.messages.fetch(msg.id);
-                    await m.edit({ embeds: [resultEmbed], components: [] });
-                } catch (e2) {
-                    console.error("❌ [baucua] Không thể cập nhật kết quả:", e2.message);
-                }
-            }
+            await safeEdit(interaction, { embeds: [resultEmbed], components: [] }, msg.id);
           } catch (err) {
             console.error("❌ [baucua] Lỗi khi xử lý kết quả:", err);
           } finally {
             games.delete(msg.id);
           }
-        }, 30000);
+        }, BET_TIME);
     },
 
     async handleButton(interaction) {
         const game = games.get(interaction.message.id);
-        if (!game) return interaction.reply({ content: "❌ Bàn này đã đóng!", flags: 64 });
-        if (game.bets.has(interaction.user.id)) return interaction.reply({ content: "❌ Bạn đã cược rồi!", flags: 64 });
+        if (!game || game.locked) return interaction.reply({ content: "❌ Bàn này đã đóng!", flags: 64 });
+        if (game.bets.has(interaction.user.id)) {
+            const old = game.bets.get(interaction.user.id);
+            return interaction.reply({ content: `❌ Bạn đã cược ${vnd(old.amount)} vào ${EMOJIS[old.face]} **${NAMES[old.face]}** rồi!`, flags: 64 });
+        }
 
         const face = interaction.customId.split("_")[1];
         const modal = new ModalBuilder()
             .setCustomId(`baucua_modal_${face}`)
-            .setTitle(`💰 Đặt cược vào ${EMOJIS[face]} ${face.toUpperCase()}`);
-
+            .setTitle(`${EMOJIS[face]} Cược ${NAMES[face]} — nhập tiền`);
         const input = new TextInputBuilder()
             .setCustomId("bet_amount")
-            .setLabel("Số tiền bạn muốn đặt (VND)")
+            .setLabel("Số tiền bạn muốn đặt (tối thiểu 1.000):")
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
-            .setPlaceholder("Tối thiểu 1000");
+            .setPlaceholder("VD: 20000");
 
         modal.addComponents(new ActionRowBuilder().addComponents(input));
         await interaction.showModal(modal);
@@ -205,26 +218,24 @@ module.exports = {
 
     async handleModal(interaction) {
         const face = interaction.customId.split("_")[2];
-        const amount = parseInt(interaction.fields.getTextInputValue("bet_amount"));
+        const amount = parseInt(interaction.fields.getTextInputValue("bet_amount").replace(/[.,\s]/g, ""));
         const game = games.get(interaction.message.id);
 
         if (!game || game.locked || Date.now() >= game.endsAt) {
             return interaction.reply({ content: "❌ Bàn đã kết thúc! Tiền của bạn KHÔNG bị trừ.", flags: 64 });
         }
-        if (isNaN(amount) || amount < 1000) return interaction.reply({ content: "❌ Tiền cược không hợp lệ!", flags: 64 });
+        if (isNaN(amount) || amount < 1000) return interaction.reply({ content: "❌ Tiền cược không hợp lệ (tối thiểu 1.000)!", flags: 64 });
 
         let user = await User.findOne({ userId: interaction.user.id });
         if (!user) user = await User.create({ userId: interaction.user.id });
-
-        if (user.money < amount) return interaction.reply({ content: "❌ Không đủ tiền cược!", flags: 64 });
+        if (user.money < amount) return interaction.reply({ content: `❌ Ví bạn chỉ còn ${vnd(user.money)}!`, flags: 64 });
 
         user.money -= amount;
         await user.save();
-
         game.bets.set(interaction.user.id, { face, amount });
 
         await interaction.reply({
-            content: `✅ Bạn đã xuống xác **${amount.toLocaleString("vi-VN")} VND** vào **${EMOJIS[face]} ${face.toUpperCase()}**!`,
+            content: `✅ Đã xuống ${vnd(amount)} vào ${EMOJIS[face]} **${NAMES[face].toUpperCase()}**!\n💼 Ví còn: ${vnd(user.money)} • Xóc đĩa ${countdown(game.endsAt)}`,
             flags: 64,
         });
     },

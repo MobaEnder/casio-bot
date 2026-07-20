@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const User = require("../models/User");
+const { COLORS, money, vnd, countdown, casinoEmbed } = require("../utils/ui");
 
 // Bộ sưu tập 50 thẻ gốc
 const BASE_CARDS = [
@@ -68,6 +69,22 @@ function refreshShop() {
     shopExpireTime = Date.now() + 3600000;
 }
 
+// Độ hiếm theo giá thẻ
+function rarity(price) {
+    if (price >= 450000) return { tag: "🌈 SSR", stars: "⭐⭐⭐⭐⭐" };
+    if (price >= 300000) return { tag: "🟣 SR", stars: "⭐⭐⭐⭐" };
+    if (price >= 200000) return { tag: "🔵 R", stars: "⭐⭐⭐" };
+    if (price >= 130000) return { tag: "🟢 UC", stars: "⭐⭐" };
+    return { tag: "⚪ C", stars: "⭐" };
+}
+
+// Ước tính DPS gốc của thẻ (cùng công thức /tuido, level 1)
+function previewDPS(card) {
+    const base = card.hp * 0.1 + card.atk * 2 + card.def * 1.5 + card.mdef * 1.5 + card.spd * 5;
+    const offensive = card.atkSpd * 100 * (1 + (card.critRate / 100) * (card.critDmg / 100));
+    return Math.floor(base + offensive);
+}
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("shopthe")
@@ -76,32 +93,44 @@ module.exports = {
     async execute(interaction) {
         if (Date.now() > shopExpireTime) refreshShop();
 
-        const embed = new EmbedBuilder()
-            .setColor(0x9b59b6)
-            .setTitle("🏪 SHOP THẺ BÀI GACHA")
-            .setDescription(`⏳ Shop sẽ làm mới sau: <t:${Math.floor(shopExpireTime / 1000)}:R>\n\n` + 
-                currentShop.map((card, i) => `**${i + 1}. ${card.name}** - 💰 ${card.price.toLocaleString()} VND\n` +
-                `*❤️ HP: ${card.hp} | ⚔️ ATK: ${card.atk} | 🛡️ DEF: ${card.def}*`).join("\n\n")
+        const user = await User.findOne({ userId: interaction.user.id });
+        const wallet = user?.money || 0;
+
+        const list = currentShop.map((card, i) => {
+            const r = rarity(card.price);
+            const affordable = wallet >= card.price;
+            return (
+                `${affordable ? "🟢" : "🔴"} **${i + 1}. ${card.name}** ${r.tag} ${r.stars}\n` +
+                `> 💰 \`${money(card.price)} VND\` • 🔥 DPS gốc: \`${money(previewDPS(card))}\`\n` +
+                `> ❤️ ${card.hp} | ⚔️ ${card.atk} | 🛡️ ${card.def} | 👟 ${card.spd} | 🎯 ${card.critRate}%`
+            );
+        }).join("\n\n");
+
+        const embed = casinoEmbed({ color: COLORS.purple, title: "🏪 ✦ TIỆM THẺ BÀI GACHA ✦ 🃏" })
+            .setDescription(
+                `> 💼 Ví của bạn: **\`${money(wallet)} VND\`** • 🎒 Túi tối đa **5 thẻ**\n` +
+                `> 🔄 Shop làm mới ${countdown(shopExpireTime)}\n${"─".repeat(25)}\n${list}`
             )
-            .setFooter({ text: "Tin nhắn tự hủy sau 60s nếu không tương tác" });
+            .setFooter({ text: "🟢 đủ tiền • 🔴 thiếu tiền • Tin nhắn tự hủy sau 60s nếu không tương tác" });
 
         const row = new ActionRowBuilder();
         currentShop.forEach((card, i) => {
-            row.addComponents(new ButtonBuilder().setCustomId(`shopthe_buy_${i}`).setLabel(`Mua Thẻ ${i + 1}`).setStyle(ButtonStyle.Primary));
+            row.addComponents(
+                new ButtonBuilder().setCustomId(`shopthe_buy_${i}`).setLabel(`Mua Thẻ ${i + 1}`).setEmoji("🃏").setStyle(ButtonStyle.Primary)
+            );
         });
 
-        const message = await interaction.reply({ embeds: [embed], components: [row], fetchReply: true });
+        await interaction.reply({ embeds: [embed], components: [row] });
+        const message = await interaction.fetchReply();
 
-        // Tự động xóa sau 60s nếu không ai nhấn
         const collector = message.createMessageComponentCollector({ time: 60000 });
 
-        collector.on('end', collected => {
+        collector.on("end", (collected) => {
             if (collected.size === 0) {
                 interaction.deleteReply().catch(() => {});
             } else {
-                // Vô hiệu hóa nút sau khi hết hạn để tránh spam shop cũ
                 const disabledRow = new ActionRowBuilder();
-                row.components.forEach(btn => disabledRow.addComponents(ButtonBuilder.from(btn).setDisabled(true)));
+                row.components.forEach((btn) => disabledRow.addComponents(ButtonBuilder.from(btn).setDisabled(true)));
                 interaction.editReply({ components: [disabledRow] }).catch(() => {});
             }
         });
@@ -112,24 +141,35 @@ module.exports = {
         const action = parts[1];
         const user = await User.findOne({ userId: interaction.user.id });
 
-        if (!user) return interaction.reply({ content: "❌ Không tìm thấy dữ liệu!", flags: 64 });
+        if (!user) return interaction.reply({ content: "❌ Không tìm thấy dữ liệu! Dùng /daily để khởi tạo tài khoản.", flags: 64 });
 
+        // --- MUA THẺ (logic GIỮ NGUYÊN) ---
         if (action === "buy") {
             const shopIndex = parseInt(parts[2]);
             const cardToBuy = currentShop[shopIndex];
-            if (user.money < cardToBuy.price) return interaction.reply({ content: "❌ Bạn không đủ tiền!", flags: 64 });
+            if (!cardToBuy) return interaction.reply({ content: "❌ Shop đã làm mới, thẻ này không còn nữa! Gõ /shopthe để xem đợt mới.", flags: 64 });
+            if (user.money < cardToBuy.price) {
+                return interaction.reply({ content: `❌ Thiếu **${money(cardToBuy.price - user.money)} VND** nữa mới rước được **${cardToBuy.name}**!`, flags: 64 });
+            }
 
+            // Túi đầy → chọn thẻ vứt
             if (user.cards && user.cards.length >= 5) {
-                const fullEmbed = new EmbedBuilder()
-                    .setColor(0xe74c3c)
-                    .setTitle("🎒 TÚI ĐỒ ĐÃ ĐẦY (5/5)!")
-                    .setDescription(`Bạn muốn mua **${cardToBuy.name}**.\nChọn 1 thẻ để vứt bỏ:`);
-                
+                const r = rarity(cardToBuy.price);
+                const fullEmbed = casinoEmbed({ color: COLORS.red, title: "🎒 TÚI ĐỒ ĐÃ ĐẦY (5/5)!" })
+                    .setDescription(
+                        `Bạn muốn rước **${cardToBuy.name}** ${r.tag} về đội.\n` +
+                        `⚠️ Hãy chọn 1 thẻ để **vứt bỏ vĩnh viễn** (cẩn thận kẻo tiếc):`
+                    );
+
                 const replaceRow = new ActionRowBuilder();
                 user.cards.forEach((c, i) => {
-                    replaceRow.addComponents(new ButtonBuilder().setCustomId(`shopthe_replace_${shopIndex}_${i}`).setLabel(`Bỏ ${c.name}`).setStyle(ButtonStyle.Danger));
+                    replaceRow.addComponents(
+                        new ButtonBuilder().setCustomId(`shopthe_replace_${shopIndex}_${i}`).setLabel(`Bỏ [Lv.${c.level || 1}] ${c.name}`.slice(0, 80)).setStyle(ButtonStyle.Danger)
+                    );
                 });
-                const cancelRow = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId("shopthe_cancel").setLabel("Hủy").setStyle(ButtonStyle.Secondary));
+                const cancelRow = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder().setCustomId("shopthe_cancel").setLabel("Hủy — giữ nguyên đội hình").setEmoji("↩️").setStyle(ButtonStyle.Secondary)
+                );
 
                 return interaction.reply({ embeds: [fullEmbed], components: [replaceRow, cancelRow], flags: 64 });
             }
@@ -137,25 +177,43 @@ module.exports = {
             user.money -= cardToBuy.price;
             user.cards.push({ ...cardToBuy });
             await user.save();
-            return interaction.reply({ content: `✅ Đã mua **${cardToBuy.name}**!`, flags: 64 });
+
+            const r = rarity(cardToBuy.price);
+            return interaction.reply({
+                embeds: [casinoEmbed({ color: COLORS.green, title: "🧾 RƯỚC THẺ THÀNH CÔNG!" })
+                    .setDescription(
+                        `# 🃏 ${cardToBuy.name}\n` +
+                        `> ${r.tag} ${r.stars} • 🔥 DPS gốc: \`${money(previewDPS(cardToBuy))}\`\n` +
+                        `> 💵 Thanh toán: \`-${money(cardToBuy.price)} VND\` • Ví còn: ${vnd(user.money)}\n` +
+                        `> 🎒 Túi đồ: **${user.cards.length}/5** thẻ\n\n` +
+                        `💡 *Gõ /tuido để nâng cấp, /leothap để đưa thẻ đi chinh chiến!*`
+                    )],
+                flags: 64,
+            });
         }
 
+        // --- THAY THẺ (logic GIỮ NGUYÊN) ---
         if (action === "replace") {
             const shopIndex = parseInt(parts[2]);
             const userCardIndex = parseInt(parts[3]);
             const cardToBuy = currentShop[shopIndex];
+            if (!cardToBuy) return interaction.update({ content: "❌ Shop đã làm mới, thẻ không còn!", embeds: [], components: [] });
 
             if (user.money < cardToBuy.price) return interaction.update({ content: "❌ Hết tiền rồi!", embeds: [], components: [] });
 
             const oldName = user.cards[userCardIndex].name;
             user.money -= cardToBuy.price;
             user.cards[userCardIndex] = { ...cardToBuy };
-            user.markModified('cards');
+            user.markModified("cards");
             await user.save();
 
-            return interaction.update({ content: `✅ Đã thay **${oldName}** bằng **${cardToBuy.name}**!`, embeds: [], components: [] });
+            return interaction.update({
+                content: `✅ Đã tiễn **${oldName}** ra đảo và chào đón **${cardToBuy.name}** ${rarity(cardToBuy.price).tag} về đội!\n💼 Ví còn: ${vnd(user.money)}`,
+                embeds: [],
+                components: [],
+            });
         }
 
-        if (action === "cancel") return interaction.update({ content: "✅ Đã hủy.", embeds: [], components: [] });
-    }
+        if (action === "cancel") return interaction.update({ content: "↩️ Đã hủy — đội hình giữ nguyên.", embeds: [], components: [] });
+    },
 };

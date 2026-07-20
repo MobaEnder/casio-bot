@@ -13,6 +13,7 @@ const userSchema = new mongoose.Schema({
   lastDaily: { type: Date, default: null },
   lastWork: { type: Date, default: null },
   lastSteal: { type: Date, default: null }, // Riêng cho lệnh ăn trộm
+  lastThief: { type: Number, default: 0 }, // 🐛 FIX: antrom ghi vào field này nhưng schema thiếu -> mongoose vứt bỏ -> cooldown 2h không bao giờ hoạt động
 
   // 📊 Thống kê
   stats: {
@@ -22,6 +23,33 @@ const userSchema = new mongoose.Schema({
     totalEarned: { type: Number, default: 0 }, 
     totalSpent: { type: Number, default: 0 }, 
   },
+
+  // ⭐ Hệ thống Level (1 tin nhắn trong kênh casino = 1 EXP)
+  level: { type: Number, default: 1 },
+  exp: { type: Number, default: 0 },
+  totalMessages: { type: Number, default: 0 },
+
+  // 📜 Nhiệm vụ hằng ngày: { date, baseline: {gamble, win, msg}, claimed: [] }
+  quests: { type: Object, default: {} },
+
+  // 🏦 Cướp ngân hàng tổ đội (cooldown 2h lưu DB)
+  lastHeist: { type: Number, default: 0 },
+
+  // 🎡 Vòng quay may mắn (1 lượt free/ngày)
+  lastSpin: { type: Number, default: 0 },
+
+  // 🔥 Chuỗi điểm danh liên tục
+  streak: { type: Number, default: 0 },
+
+  // 🥤 Đoán cốc miễn phí (cooldown 1h lưu DB)
+  lastCup: { type: Number, default: 0 },
+
+  // 🏅 Thành tựu: { claimed: [id], displayed: id }
+  achievements: { type: Object, default: {} },
+
+  // 🐾 Hệ thống Pet: mảng pet + kho thức ăn
+  pets: { type: Array, default: [] },
+  petFood: { type: Object, default: {} },
 
   // 🎒 Hệ thống Túi đồ (Item thường)
   inventory: [

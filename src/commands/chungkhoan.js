@@ -1,6 +1,5 @@
 const {
     SlashCommandBuilder,
-    EmbedBuilder,
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
@@ -9,10 +8,11 @@ const {
     TextInputStyle,
 } = require("discord.js");
 const User = require("../models/User");
+const { COLORS, money, vnd, casinoEmbed, safeEdit } = require("../utils/ui");
 
-// Hàm vẽ biểu đồ bằng emoji
+// Vẽ biểu đồ nến emoji (giữ nguyên thuật toán, mở rộng chiều cao)
 function generateChart(history) {
-    const chartHeight = 5;
+    const chartHeight = 6;
     const min = Math.min(...history) - 1;
     const max = Math.max(...history) + 1;
     const range = max - min || 1;
@@ -35,17 +35,23 @@ function generateChart(history) {
     return display;
 }
 
+// Mã cổ phiếu ngẫu nhiên cho vui
+const TICKERS = ["🪙 MEO/USDT", "💎 KIMCUONG", "🐔 GAVANG", "🍜 PHOCP", "🚀 TOMOON", "🧻 GIAYVS"];
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("chungkhoan")
         .setDescription("📈 Chứng khoán 15s"),
 
     async execute(interaction) {
-        const embed = new EmbedBuilder()
-            .setColor(0x00fbff)
-            .setTitle("📊 SÀN GIAO DỊCH QUỐC TẾ")
-            .setDescription("Dự đoán hướng đi của thị trường trong 15s tới để X2 tài sản!\n⚠️ **Cảnh báo:** Thị trường đang biến động rất rủi ro.")
-            .addFields({ name: "Lưu ý", value: "Sử dụng Khiên (Shield) để bảo toàn vốn khi đoán sai." });
+        const embed = casinoEmbed({ color: COLORS.cyan, title: "📊 ✦ SÀN GIAO DỊCH QUỐC TẾ ✦ 📊" })
+            .setDescription(
+                `> 🎯 Dự đoán hướng thị trường trong **15 giây** → ăn **x2** tài sản!\n` +
+                `> 📈 **BUY** nếu tin giá LÊN • 📉 **SELL** nếu tin giá XUỐNG\n\n` +
+                `\`\`\`\n📉📈 Thị trường đang chờ lệnh của bạn...\n\`\`\``
+            )
+            .addFields({ name: "⚠️ Cảnh báo rủi ro", value: "Thị trường biến động cực mạnh. Dùng 🔰 Khiên (mua ở /shop) để bảo toàn vốn khi đoán sai." })
+            .setFooter({ text: "💼 Đầu tư có trách nhiệm... hoặc không 😏" });
 
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId("chungkhoan_up").setLabel("BUY (LÊN)").setStyle(ButtonStyle.Success).setEmoji("📈"),
@@ -59,7 +65,7 @@ module.exports = {
         const side = interaction.customId.split("_")[1];
         const modal = new ModalBuilder()
             .setCustomId(`chungkhoan_modal_${side}`)
-            .setTitle(`Khớp lệnh: ${side === "up" ? "MUA VÀO" : "BÁN RA"}`);
+            .setTitle(`Khớp lệnh: ${side === "up" ? "📈 MUA VÀO" : "📉 BÁN RA"}`);
 
         const input = new TextInputBuilder()
             .setCustomId("amount")
@@ -74,68 +80,70 @@ module.exports = {
 
     async handleModal(interaction) {
         const side = interaction.customId.split("_")[2];
-        const amount = parseInt(interaction.fields.getTextInputValue("amount"));
+        const amount = parseInt(interaction.fields.getTextInputValue("amount").replace(/[.,\s]/g, ""));
 
-        if (isNaN(amount) || amount < 1000) return interaction.reply({ content: "❌ Số tiền không hợp lệ!", flags: 64 });
+        if (isNaN(amount) || amount < 1000) return interaction.reply({ content: "❌ Số tiền không hợp lệ (tối thiểu 1.000)!", flags: 64 });
 
         let user = await User.findOne({ userId: interaction.user.id });
-        if (!user || user.money < amount) return interaction.reply({ content: "❌ Bạn không đủ tiền!", flags: 64 });
+        if (!user || user.money < amount) return interaction.reply({ content: `❌ Ví bạn chỉ còn ${vnd(user?.money || 0)}!`, flags: 64 });
+        if (user.banned) return interaction.reply({ content: "🚫 Bạn bị cấm giao dịch!", flags: 64 });
 
         user.money -= amount;
         await user.save();
 
-        let history = [10]; 
+        const ticker = TICKERS[Math.floor(Math.random() * TICKERS.length)];
+        let history = [10];
         let seconds = 0;
         const maxSeconds = 15;
+        const startPrice = history[0];
 
-        const initialEmbed = new EmbedBuilder()
-            .setColor(0xffff00)
-            .setTitle("📉 ĐANG THEO DÕI BIẾN ĐỘNG...")
-            .setDescription(`Lệnh: **${side === "up" ? "MUA" : "BÁN"}** | Vốn: **${amount.toLocaleString()}**\n\n${generateChart(history)}`);
+        const marketEmbed = (title, color) => {
+            const cur = history[history.length - 1];
+            const change = ((cur - startPrice) / startPrice) * 100;
+            const arrow = change >= 0 ? "🟢 +" : "🔴 ";
+            return casinoEmbed({ color, title })
+                .setDescription(
+                    `> 📌 Mã: **${ticker}** • Lệnh: **${side === "up" ? "📈 MUA" : "📉 BÁN"}** • Vốn: ${vnd(amount)}\n` +
+                    `> 💹 Giá vào lệnh: \`${startPrice.toFixed(2)}\` → Hiện tại: \`${cur.toFixed(2)}\` (${arrow}${change.toFixed(1)}%)\n\n` +
+                    generateChart(history)
+                )
+                .setFooter({ text: "🟩 nến tăng • 🟥 nến giảm • Chốt theo giá cuối so với giá vào lệnh" });
+        };
 
-        await interaction.reply({ embeds: [initialEmbed] });
+        await interaction.reply({ embeds: [marketEmbed("📡 ĐANG KHỚP LỆNH — THEO DÕI BIẾN ĐỘNG...", COLORS.gold)] });
 
         const interval = setInterval(async () => {
+          try {
             seconds++;
-            
-            let nextPrice;
-            const startPrice = history[0];
 
+            let nextPrice;
             if (seconds < maxSeconds) {
-                // Biến động ngẫu nhiên trong 14 giây đầu
-                const change = (Math.random() * 4 - 2);
+                // Biến động ngẫu nhiên (giữ nguyên)
+                const change = Math.random() * 4 - 2;
                 nextPrice = Math.max(1, history[history.length - 1] + change);
             } else {
-                /* ========================================= */
-                /* 🎯 LOGIC TỈ LỆ THẮNG 35/65                */
-                /* ========================================= */
-                const isWin = Math.random() < 0.35; // 35% cơ hội thắng
-
+                // 🎯 LÕI TỈ LỆ 35/65 (giữ nguyên)
+                const isWin = Math.random() < 0.35;
                 if (side === "up") {
-                    // Nếu đặt LÊN: Thắng thì giá > startPrice, Thua thì giá < startPrice
-                    nextPrice = isWin ? (startPrice + Math.random() * 3 + 1) : (startPrice - Math.random() * 3 - 1);
+                    nextPrice = isWin ? startPrice + Math.random() * 3 + 1 : startPrice - Math.random() * 3 - 1;
                 } else {
-                    // Nếu đặt XUỐNG: Thắng thì giá < startPrice, Thua thì giá > startPrice
-                    nextPrice = isWin ? (startPrice - Math.random() * 3 - 1) : (startPrice + Math.random() * 3 + 1);
+                    nextPrice = isWin ? startPrice - Math.random() * 3 - 1 : startPrice + Math.random() * 3 + 1;
                 }
-                nextPrice = Math.max(0.5, nextPrice); // Đảm bảo giá không âm
+                nextPrice = Math.max(0.5, nextPrice);
             }
 
             history.push(nextPrice);
             if (history.length > 15) history.shift();
 
             if (seconds < maxSeconds) {
-                const updateEmbed = new EmbedBuilder()
-                    .setColor(0xffff00)
-                    .setTitle(`📉 THỊ TRƯỜNG ĐANG CHẠY (${maxSeconds - seconds}s)`)
-                    .setDescription(`Lệnh: **${side === "up" ? "MUA" : "BÁN"}** | Vốn: **${amount.toLocaleString()}**\n\n${generateChart(history)}`);
-                await interaction.editReply({ embeds: [updateEmbed] }).catch(() => {});
+                await safeEdit(interaction, { embeds: [marketEmbed(`📡 THỊ TRƯỜNG ĐANG CHẠY — CHỐT SAU ${maxSeconds - seconds}s`, COLORS.gold)] });
             } else {
                 clearInterval(interval);
-                
+
                 const endPrice = history[history.length - 1];
                 const trend = endPrice >= startPrice ? "up" : "down";
                 const finalWin = side === trend;
+                const changePct = ((endPrice - startPrice) / startPrice) * 100;
 
                 let userUpdate = await User.findOne({ userId: interaction.user.id });
                 let resultText = "";
@@ -144,29 +152,48 @@ module.exports = {
                 if (finalWin) {
                     const winAmt = amount * 2;
                     userUpdate.money += winAmt;
-                    resultText = `✅ **THẮNG!** Giá chốt: **${endPrice.toFixed(2)}** (Gốc: ${startPrice.toFixed(2)})\n💰 Nhận được: **+${winAmt.toLocaleString()} VND**`;
+                    if (userUpdate.stats) { userUpdate.stats.win++; userUpdate.stats.gamblePlayed++; }
+                    resultText =
+                        `# 🚀 +${money(amount)} VND\n` +
+                        `> ✅ Chốt \`${endPrice.toFixed(2)}\` (${changePct >= 0 ? "+" : ""}${changePct.toFixed(1)}%) — đoán chuẩn như chuyên gia!\n` +
+                        `> 💰 Nhận về: **+${money(winAmt)}** • Ví: ${vnd(userUpdate.money)}`;
                 } else {
                     if (userUpdate.buffs?.shield > 0) {
                         const refund = Math.floor(amount * userUpdate.buffs.shield);
                         userUpdate.money += refund;
                         userUpdate.buffs.shield = 0;
                         shieldUsed = true;
-                        resultText = `❌ **THUA!** Giá chốt: **${endPrice.toFixed(2)}**\n🔰 **KHIÊN:** Đã hoàn lại **${refund.toLocaleString()} VND**.`;
+                        resultText =
+                            `# 📉 -${money(amount - refund)} VND\n` +
+                            `> ❌ Chốt \`${endPrice.toFixed(2)}\` (${changePct >= 0 ? "+" : ""}${changePct.toFixed(1)}%) — thị trường quay xe!\n` +
+                            `> 🔰 **KHIÊN kích hoạt:** hoàn lại **+${money(refund)}** • Ví: ${vnd(userUpdate.money)}`;
                     } else {
-                        resultText = `❌ **THUA!** Bạn đã mất **${amount.toLocaleString()} VND**.`;
+                        resultText =
+                            `# 💸 -${money(amount)} VND\n` +
+                            `> ❌ Chốt \`${endPrice.toFixed(2)}\` (${changePct >= 0 ? "+" : ""}${changePct.toFixed(1)}%) — cháy tài khoản!\n` +
+                            `> 🥲 Ví còn: ${vnd(userUpdate.money)}`;
                     }
+                    if (userUpdate.stats) { userUpdate.stats.lose++; userUpdate.stats.gamblePlayed++; }
                 }
 
                 await userUpdate.save();
 
-                const finalEmbed = new EmbedBuilder()
-                    .setColor(finalWin ? 0x00ff00 : 0xff0000)
-                    .setTitle(finalWin ? "🚀 CHỐT LỜI THÀNH CÔNG" : "📉 GIAO DỊCH THẤT BẠI")
-                    .setDescription(`${generateChart(history)}\n${resultText}`)
-                    .setFooter({ text: shieldUsed ? "🛡️ Đã sử dụng Khiên bảo vệ" : "Sàn giao dịch kết thúc." });
+                const finalEmbed = casinoEmbed({
+                    color: finalWin ? COLORS.green : COLORS.red,
+                    title: finalWin ? "🚀 CHỐT LỜI THÀNH CÔNG — TO THE MOON!" : "📉 GIAO DỊCH THẤT BẠI — ĐU ĐỈNH RỒI!",
+                })
+                    .setDescription(
+                        `> 📌 **${ticker}** • Vào lệnh \`${startPrice.toFixed(2)}\` → Chốt \`${endPrice.toFixed(2)}\`\n\n` +
+                        generateChart(history) + "\n" + resultText
+                    )
+                    .setFooter({ text: shieldUsed ? "🛡️ Đã sử dụng Khiên bảo vệ • Gõ /chungkhoan để gỡ!" : "📊 Sàn đóng cửa • Gõ /chungkhoan để giao dịch tiếp!" });
 
-                await interaction.editReply({ embeds: [finalEmbed] });
+                await safeEdit(interaction, { embeds: [finalEmbed] });
             }
+          } catch (err) {
+            clearInterval(interval);
+            console.error("❌ [chungkhoan] Lỗi phiên giao dịch:", err);
+          }
         }, 1000);
-    }
+    },
 };

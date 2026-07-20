@@ -1,127 +1,128 @@
-const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
+const { SlashCommandBuilder } = require("discord.js");
 const User = require("../models/User");
+const { COLORS, money, vnd, casinoEmbed, sleep } = require("../utils/ui");
 
-// --- CÁC ICON NGỘ NGHĨNH DÀNH CHO SLOT ---
+// --- BIỂU TƯỢNG SLOT ---
 const SLOTS = ["🍒", "🍇", "🍉", "🍓", "🍀", "🔔", "💖", "💎"];
-const SPINNING = "<a:loading:1000000000000000000>"; // Nếu bạn có icon GIF xoay, thay ID vào đây. Nếu không, xài "🌀" tạm nhé.
-const SPIN_EMOJI = "🌀"; 
+const SPIN = "🌀";
 
-// Hàm random icon
-function getRandomSlot() {
-    return SLOTS[Math.floor(Math.random() * SLOTS.length)];
+const getRandomSlot = () => SLOTS[Math.floor(Math.random() * SLOTS.length)];
+
+// Máy slot khung đẹp, có hàng mờ trên/dưới như máy thật
+function renderMachine(e1, e2, e3, spinning = false) {
+    const blur = () => (spinning ? getRandomSlot() : "▪️");
+    return (
+        `╔══════ 🎰 ══════╗\n` +
+        `║  ${blur()} ┊ ${blur()} ┊ ${blur()}  ║\n` +
+        `║ ▸ ${e1} ┊ ${e2} ┊ ${e3} ◂ ║\n` +
+        `║  ${blur()} ┊ ${blur()} ┊ ${blur()}  ║\n` +
+        `╚═════════════════╝`
+    );
 }
 
-// Hàm vẽ khung máy chơi Slot
-function renderSlotMachine(e1, e2, e3) {
-    return `
-\`      ___🎰 SLOTS 🎰___\`
-⬛ \`|\` ${e1} \`|\` ${e2} \`|\` ${e3} \`|\` ⬛
-\`      -----------------\`
-`;
-}
-
-// Hàm delay để tạo hiệu ứng quay
-const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+// Bảng tỉ lệ hiển thị cho người chơi
+const PAYTABLE =
+    "💎💎💎 → **x50** 🏆\n" +
+    "3 ô giống nhau → **x5**\n" +
+    "2 ô kề giống nhau → **x1.5**";
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("jackpot")
         .setDescription("🎰 Nổ hũ đổi đời - Nhập số tiền và xem nhân phẩm")
-        .addIntegerOption(opt => 
+        .addIntegerOption((opt) =>
             opt.setName("tiencuoc")
-               .setDescription("Số tiền muốn mang đi cược (Tối thiểu 5,000 VND)")
-               .setRequired(true)
-               .setMinValue(5000)
+                .setDescription("Số tiền muốn mang đi cược (Tối thiểu 5,000 VND)")
+                .setRequired(true)
+                .setMinValue(5000)
         ),
 
     async execute(interaction) {
         const betAmount = interaction.options.getInteger("tiencuoc");
-
-        // Delay reply vì chúng ta sẽ edit tin nhắn nhiều lần để tạo hiệu ứng
         await interaction.deferReply();
 
         const user = await User.findOne({ userId: interaction.user.id });
-
-        // 1. Kiểm tra tiền túi
         if (!user || user.money < betAmount) {
-            return interaction.editReply({ content: `❌ Khố rách áo ôm mà đòi chơi sang! Bạn chỉ còn \`${(user?.money || 0).toLocaleString()} VND\` thôi.` });
+            return interaction.editReply({
+                embeds: [casinoEmbed({
+                    color: COLORS.red,
+                    title: "❌ KHÔNG ĐỦ VỐN",
+                    description: `Khố rách áo ôm mà đòi chơi sang!\n💳 Ví của bạn: ${vnd(user?.money || 0)}`,
+                })],
+            });
         }
+        if (user.banned) return interaction.editReply({ content: "🚫 Bạn bị cấm cược!" });
 
-        // 2. Trừ tiền cược trước (Chơi là phải giam vốn)
         user.money -= betAmount;
         await user.save();
 
-        // 3. Chuẩn bị kết quả trước khi hiển thị
-        const result1 = getRandomSlot();
-        const result2 = getRandomSlot();
-        const result3 = getRandomSlot();
+        const r1 = getRandomSlot(), r2 = getRandomSlot(), r3 = getRandomSlot();
 
-        // 4. HIỆU ỨNG QUAY (SPINNING ANIMATION)
-        const embed = new EmbedBuilder()
-            .setColor(0xf1c40f)
-            .setTitle(`🎰 CHUYẾN TÀU KHỞI NGHIỆP CỦA ${interaction.user.username.toUpperCase()} 🎰`)
-            .setDescription(`**Tiền cược:** \`${betAmount.toLocaleString()} VND\``);
+        const baseEmbed = () =>
+            casinoEmbed({ color: COLORS.gold, title: `🎰 MÁY NỔ HŨ CỦA ${interaction.user.username.toUpperCase()}` });
 
-        // Khung 1: Đang quay cả 3 ô
-        embed.addFields({ name: "Kết quả", value: renderSlotMachine(SPIN_EMOJI, SPIN_EMOJI, SPIN_EMOJI) });
-        await interaction.editReply({ embeds: [embed] });
-        await wait(1000); // Đợi 1 giây
-
-        // Khung 2: Chốt ô số 1
-        embed.spliceFields(0, 1, { name: "Kết quả", value: renderSlotMachine(result1, SPIN_EMOJI, SPIN_EMOJI) });
-        await interaction.editReply({ embeds: [embed] });
-        await wait(1000); // Đợi 1 giây
-
-        // Khung 3: Chốt ô số 2
-        embed.spliceFields(0, 1, { name: "Kết quả", value: renderSlotMachine(result1, result2, SPIN_EMOJI) });
-        await interaction.editReply({ embeds: [embed] });
-        await wait(1500); // Hồi hộp ô cuối nên đợi 1.5 giây
-
-        // Khung 4: Chốt ô cuối (Kết quả chung cuộc)
-        embed.spliceFields(0, 1, { name: "Kết quả", value: renderSlotMachine(result1, result2, result3) });
-
-        // 5. TÍNH TOÁN KẾT QUẢ VÀ TRẢ THƯỞNG
-        let winAmount = 0;
-        let resultMessage = "";
-        let resultColor = 0xe74c3c; // Đỏ (Thua mặc định)
-
-        // Nếu cả 3 ô giống nhau
-        if (result1 === result2 && result2 === result3) {
-            if (result1 === "💎") {
-                // NỔ HŨ KIM CƯƠNG (JACKPOT BIG WIN) x50
-                winAmount = betAmount * 50;
-                resultMessage = `🎉 **JACKPOT KIM CƯƠNG!!!** 🎉\nChúa tể nhân phẩm là đây! Bạn ăn x50 tiền cược.`;
-                resultColor = 0x1abc9c; // Xanh ngọc
-            } else {
-                // Thắng 3 ô thường x5
-                winAmount = betAmount * 5;
-                resultMessage = `🎊 **TRÚNG ĐẬM!!!** 🎊\nĐẹp trai đấy! Bạn ăn x5 tiền cược.`;
-                resultColor = 0x2ecc71; // Xanh lá
-            }
-        } 
-        // Nếu có 2 ô giống nhau kề nhau (An ủi)
-        else if (result1 === result2 || result2 === result3) {
-            winAmount = Math.floor(betAmount * 1.5); // Lãi nhẹ x1.5
-            resultMessage = `✨ **SUÝT THÌ NỔ HŨ!** ✨\nĂn an ủi x1.5 tiền cược nhé!`;
-            resultColor = 0x3498db; // Xanh dương
-        } 
-        // Nếu thua trắng
-        else {
-            winAmount = 0;
-            resultMessage = `💀 **THUA TRẮNG!** 💀\nĐen thôi đỏ quên đi. Số tiền \`${betAmount.toLocaleString()} VND\` đã bay theo chiều gió...`;
+        // 🎬 Hiệu ứng quay từng ô
+        const frames = [
+            [SPIN, SPIN, SPIN, 900],
+            [r1, SPIN, SPIN, 900],
+            [r1, r2, SPIN, 1400],
+        ];
+        for (const [a, b, c, ms] of frames) {
+            await interaction.editReply({
+                embeds: [baseEmbed().setDescription(
+                    `💵 Tiền cược: ${vnd(betAmount)}\n\`\`\`\n${renderMachine(a, b, c, true)}\n\`\`\`\n⏳ *Đang quay... cầu nguyện đi!*`
+                )],
+            });
+            await sleep(ms);
         }
 
-        // 6. Cộng tiền nếu thắng và Lưu DB
+        // 🧮 Tính thưởng (giữ nguyên tỉ lệ gốc)
+        let winAmount = 0, title, flavor, color;
+        if (r1 === r2 && r2 === r3) {
+            if (r1 === "💎") {
+                winAmount = betAmount * 50;
+                title = "💎💎💎 JACKPOT KIM CƯƠNG!!! 💎💎💎";
+                flavor = "🎆 CHÚA TỂ NHÂN PHẨM LÀ ĐÂY! Cả sòng quỳ rạp!";
+                color = COLORS.cyan;
+            } else {
+                winAmount = betAmount * 5;
+                title = "🎊 TRÚNG ĐẬM — 3 Ô GIỐNG NHAU! 🎊";
+                flavor = "Đẹp trai đấy! Hôm nay ra đường nên mua vé số.";
+                color = COLORS.green;
+            }
+        } else if (r1 === r2 || r2 === r3) {
+            winAmount = Math.floor(betAmount * 1.5);
+            title = "✨ SUÝT THÌ NỔ HŨ! ✨";
+            flavor = "Thiếu đúng 1 ô... nhận an ủi x1.5 nhé!";
+            color = COLORS.blue;
+        } else {
+            title = "💀 THUA TRẮNG 💀";
+            flavor = `Đen thôi, đỏ quên đi. ${vnd(betAmount)} đã bay theo chiều gió...`;
+            color = COLORS.red;
+        }
+
         if (winAmount > 0) {
             user.money += winAmount;
+            if (user.stats) { user.stats.win++; user.stats.gamblePlayed++; }
             await user.save();
-            embed.addFields({ name: "💰 Phần Thưởng", value: `\`+${winAmount.toLocaleString()} VND\`` });
+        } else if (user.stats) {
+            user.stats.lose++; user.stats.gamblePlayed++;
+            await user.save();
         }
 
-        embed.setColor(resultColor);
-        embed.setDescription(`**Tiền cược:** \`${betAmount.toLocaleString()} VND\`\n\n${resultMessage}\n\n💳 **Ví hiện tại:** \`${user.money.toLocaleString()} VND\``);
+        const profit = winAmount - betAmount;
+        const resultEmbed = casinoEmbed({ color, title })
+            .setDescription(
+                `\`\`\`\n${renderMachine(r1, r2, r3)}\n\`\`\`\n${flavor}`
+            )
+            .addFields(
+                { name: "💵 Tiền cược", value: vnd(betAmount), inline: true },
+                { name: winAmount > 0 ? "💰 Nhận về" : "🕳️ Mất trắng", value: winAmount > 0 ? `**+${money(winAmount)}** (lãi ${profit >= 0 ? "+" : ""}${money(profit)})` : `-${money(betAmount)}`, inline: true },
+                { name: "💳 Ví hiện tại", value: vnd(user.money), inline: true },
+                { name: "📋 Bảng thưởng", value: PAYTABLE }
+            )
+            .setFooter({ text: "🎰 Gõ /jackpot để thử vận may tiếp!" });
 
-        // Update tin nhắn lần cuối
-        await interaction.editReply({ embeds: [embed] });
-    }
+        await interaction.editReply({ embeds: [resultEmbed] });
+    },
 };

@@ -1,18 +1,27 @@
-const { 
-    SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, 
-    ButtonBuilder, ButtonStyle, ComponentType 
+const {
+    SlashCommandBuilder,
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle,
+    ComponentType,
 } = require("discord.js");
 const User = require("../models/User");
+const { COLORS, money, vnd, countdown, bar, casinoEmbed } = require("../utils/ui");
+
+const PASS_FLAVOR = [
+    "ném quả bom đi như ném củ khoai nóng! 🥔",
+    "chuyền bom bằng một tay, tay kia đếm tiền! 😎",
+    "run cầm cập nhưng vẫn kịp đẩy bom đi! 😱",
+    "hét lên 'KHÔNG PHẢI HÔM NAY!' rồi ném bom! 🗣️",
+    "vừa chuyền vừa cầu nguyện tổ tiên phù hộ! 🙏",
+];
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("bomhengio")
         .setDescription("💣 Chuyền bom - Nhà cái rót tiền (Chốt hạ từ lượt thứ 4)")
-        .addIntegerOption(opt => 
-            opt.setName("tiencuoc")
-               .setDescription("Số tiền mỗi người đóng góp")
-               .setRequired(true)
-               .setMinValue(1000)
+        .addIntegerOption((opt) =>
+            opt.setName("tiencuoc").setDescription("Số tiền mỗi người đóng góp").setRequired(true).setMinValue(1000)
         ),
 
     async execute(interaction) {
@@ -22,48 +31,56 @@ module.exports = {
 
             const userCreator = await User.findOne({ userId: creator.id });
             if (!userCreator || userCreator.money < initialBet) {
-                return interaction.reply({ content: "❌ Bạn không đủ tiền khởi tạo hũ bom!", flags: 64 });
+                return interaction.reply({ content: `❌ Cần ${vnd(initialBet)} để khởi tạo hũ bom! Ví bạn còn ${vnd(userCreator?.money || 0)}.`, flags: 64 });
             }
 
             let players = [creator];
             let pot = initialBet;
+            const lobbyEndsAt = Date.now() + 45000;
 
-            const lobbyEmbed = new EmbedBuilder()
-                .setTitle("💣 PHÒNG CHỜ: BOM HẸN GIỜ")
-                .setDescription(`👤 Chủ bom: <@${creator.id}>\n💰 Hũ khởi điểm: **${pot.toLocaleString()}** VND\n🎁 **Nhà cái:** Thưởng thêm tiền mỗi lượt!\n⚠️ **Luật:** Chỉ được ÔM TIỀN từ lượt chuyền thứ 4 trở đi.`)
-                .setColor(0xffa500);
+            const renderLobby = () =>
+                casinoEmbed({ color: COLORS.orange, title: "💣 ✦ PHÒNG CHỜ: BOM HẸN GIỜ ✦ 💣" })
+                    .setDescription(
+                        `\`\`\`\n     💣\n    ╱🔥╲   tick... tock...\n\`\`\`` +
+                        `> 👑 Chủ bom: <@${creator.id}>\n` +
+                        `> 💵 Vé vào cửa: \`${money(initialBet)} VND\`/người\n` +
+                        `> 💰 Hũ hiện tại: **\`${money(pot)} VND\`** *(nhà cái rót thêm 10% mỗi lượt chuyền!)*\n` +
+                        `> ⏳ Phòng đóng ${countdown(lobbyEndsAt)}\n${"─".repeat(25)}\n` +
+                        `👥 **Đội cảm tử (${players.length}):** ${players.map((p) => `<@${p.id}>`).join(", ")}\n\n` +
+                        `⚠️ **Luật:** bom nổ trên tay ai người đó mất trắng • Chỉ được ÔM TIỀN từ lượt chuyền thứ 4 (50/50 nổ tức thì)!`
+                    )
+                    .setFooter({ text: "💣 Cần tối thiểu 2 người • Chủ bom bấm Bắt đầu khi đủ đội" });
 
             const lobbyRow = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId("join_bomb").setLabel("Tham gia").setStyle(ButtonStyle.Primary),
-                new ButtonBuilder().setCustomId("start_bomb").setLabel("Bắt đầu").setStyle(ButtonStyle.Success)
+                new ButtonBuilder().setCustomId("join_bomb").setLabel("Tham gia").setEmoji("🧨").setStyle(ButtonStyle.Primary),
+                new ButtonBuilder().setCustomId("start_bomb").setLabel("Bắt đầu").setEmoji("🔥").setStyle(ButtonStyle.Success)
             );
 
-            const msg = await interaction.reply({ embeds: [lobbyEmbed], components: [lobbyRow], fetchReply: true });
+            await interaction.reply({ embeds: [renderLobby()], components: [lobbyRow] });
+            const msg = await interaction.fetchReply();
 
             const lobbyCollector = msg.createMessageComponentCollector({ time: 45000 });
 
             lobbyCollector.on("collect", async (i) => {
                 if (i.customId === "join_bomb") {
-                    if (players.some(p => p.id === i.user.id)) return i.reply({ content: "Bạn đã tham gia rồi!", flags: 64 });
+                    if (players.some((p) => p.id === i.user.id)) return i.reply({ content: "❌ Bạn đã trong đội cảm tử rồi!", flags: 64 });
                     const pDB = await User.findOne({ userId: i.user.id });
-                    if (!pDB || pDB.money < initialBet) return i.reply({ content: "Không đủ tiền!", flags: 64 });
+                    if (!pDB || pDB.money < initialBet) return i.reply({ content: `❌ Cần ${vnd(initialBet)} để vào phòng!`, flags: 64 });
+                    if (pDB.banned) return i.reply({ content: "🚫 Bạn bị cấm chơi!", flags: 64 });
 
                     players.push(i.user);
                     pot += initialBet;
                     await i.deferUpdate();
-                    await interaction.editReply({ 
-                        embeds: [lobbyEmbed.setDescription(`👤 Chủ bom: <@${creator.id}>\n💰 Hũ hiện tại: **${pot.toLocaleString()}** VND\n👥 Danh sách: ${players.map(p => `<@${p.id}>`).join(", ")}`)] 
-                    });
+                    await interaction.editReply({ embeds: [renderLobby()] });
                 }
 
                 if (i.customId === "start_bomb") {
-                    if (i.user.id !== creator.id) return i.reply({ content: "Chỉ chủ phòng mới có thể bắt đầu!", flags: 64 });
-                    if (players.length < 2) return i.reply({ content: "Cần ít nhất 2 người!", flags: 64 });
+                    if (i.user.id !== creator.id) return i.reply({ content: "❌ Chỉ chủ bom mới có thể châm ngòi!", flags: 64 });
+                    if (players.length < 2) return i.reply({ content: "❌ Cần ít nhất 2 người mới vui!", flags: 64 });
+                    await i.deferUpdate();
                     lobbyCollector.stop("started");
                 }
             });
-
-            lobbyCollector.on("collect", async (i) => {}); // Placeholder
 
             lobbyCollector.on("end", async (_, reason) => {
                 if (reason === "started") {
@@ -72,14 +89,16 @@ module.exports = {
                     }
                     await startBombGame(interaction, players, pot, initialBet);
                 } else {
-                    await interaction.editReply({ content: "⏰ Phòng đã hủy.", embeds: [], components: [] }).catch(() => {});
+                    await interaction.editReply({
+                        embeds: [casinoEmbed({ color: COLORS.dark, title: "⏰ PHÒNG ĐÃ HỦY", description: "> Không đủ người dám chơi với tử thần... 💣💤" })],
+                        components: [],
+                    }).catch(() => {});
                 }
             });
-
         } catch (error) {
             console.error("LỖI BOM:", error);
         }
-    }
+    },
 };
 
 async function startBombGame(interaction, players, currentPot, baseBet) {
@@ -89,38 +108,48 @@ async function startBombGame(interaction, players, currentPot, baseBet) {
     const bonusPerPass = Math.floor(baseBet * 0.1);
 
     const updateGame = async (status) => {
+        // Công thức tỉ lệ nổ GIỮ NGUYÊN: 1 - 0.92^passCount
         const explodeChance = Math.floor((1 - Math.pow(0.92, passCount)) * 100);
-        
-        // Cấu hình Nút bấm
-        const gameRow = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId("pass_bomb").setLabel("Chuyền tiếp").setStyle(ButtonStyle.Primary)
-        );
 
-        // CHỐNG THÔNG ĐỒNG: Chỉ hiện nút Ôm tiền từ lượt thứ 4 (passCount >= 3)
+        const gameRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId("pass_bomb").setLabel("CHUYỀN TIẾP").setEmoji("💨").setStyle(ButtonStyle.Primary)
+        );
         if (passCount >= 3) {
             gameRow.addComponents(
-                new ButtonBuilder().setCustomId("hold_bomb").setLabel("🎁 Ôm tiền & Kết thúc").setStyle(ButtonStyle.Danger)
+                new ButtonBuilder().setCustomId("hold_bomb").setLabel(`ÔM ${money(pot)} & CHẠY (50/50)`).setEmoji("🎁").setStyle(ButtonStyle.Danger)
             );
         }
 
-        const embed = new EmbedBuilder()
-            .setTitle("💣 BOM ĐANG NÓNG - TIỀN ĐANG TĂNG!")
-            .setDescription(`📍 Người giữ: <@${players[currentIndex].id}>\n💰 **Hũ hiện tại: ${pot.toLocaleString()} VND**\n🔥 Tỉ lệ nổ: **${explodeChance}%**\n\n${status}`)
-            .setFooter({ text: passCount < 3 ? `Cần thêm ${3 - passCount} lượt chuyền nữa để có thể Ôm Tiền.` : "Cơ chế Ôm Tiền đã sẵn sàng!" })
-            .setColor(passCount < 3 ? 0x5865F2 : (explodeChance > 60 ? 0xff0000 : 0xffff00));
+        const fuseIcon = explodeChance > 60 ? "🟥" : explodeChance > 30 ? "🟧" : "🟩";
+        const embed = casinoEmbed({
+            color: passCount < 3 ? COLORS.blue : explodeChance > 60 ? COLORS.red : COLORS.gold,
+            title: "💣 BOM ĐANG NÓNG — TIỀN ĐANG PHỒNG! 💣",
+        })
+            .setDescription(
+                `\`\`\`\n      💣💥\n     ╱🔥🔥╲   HOLDER: ${players[currentIndex].username}\n\`\`\`` +
+                `> 📍 Đang cầm bom: <@${players[currentIndex].id}>\n` +
+                `> 🔄 Lượt chuyền: **${passCount}** • 👥 ${players.length} người chơi\n${"─".repeat(25)}\n` +
+                `💰 **HŨ TIỀN: \`${money(pot)} VND\`** *(+${money(bonusPerPass)}/lượt)*\n\n` +
+                `🧨 **Dây cháy (tỉ lệ nổ ${explodeChance}%):**\n${bar(explodeChance / 100, 12, fuseIcon, "⬛")}\n\n${status}`
+            )
+            .setFooter({
+                text: passCount < 3
+                    ? `🔒 Cần thêm ${3 - passCount} lượt chuyền nữa để mở khóa Ôm Tiền`
+                    : "🎁 Ôm Tiền đã mở — nhưng 50% bom nổ ngay trên tay đấy! 😈",
+            });
 
         await interaction.editReply({ content: `🔔 Lượt của <@${players[currentIndex].id}>`, embeds: [embed], components: [gameRow] });
     };
 
-    await updateGame("Trò chơi bắt đầu! Hãy chuyền bom nhanh nhất có thể.");
+    await updateGame("🏁 **Trò chơi bắt đầu!** Chuyền bom nhanh nhất có thể — chần chừ là toang!");
 
     const collector = (await interaction.fetchReply()).createMessageComponentCollector({
         componentType: ComponentType.Button,
-        time: 180000 
+        time: 180000,
     });
 
     collector.on("collect", async (i) => {
-        if (i.user.id !== players[currentIndex].id) return i.reply({ content: "Bạn không giữ bom!", flags: 64 });
+        if (i.user.id !== players[currentIndex].id) return i.reply({ content: "❌ Bạn không cầm bom! Đứng ngoài hóng thôi.", flags: 64 });
         await i.deferUpdate();
 
         if (i.customId === "pass_bomb") {
@@ -129,42 +158,58 @@ async function startBombGame(interaction, players, currentPot, baseBet) {
                 return collector.stop("exploded");
             }
             passCount++;
-            pot += bonusPerPass; 
+            pot += bonusPerPass;
+            const passer = players[currentIndex].username;
             currentIndex = (currentIndex + 1) % players.length;
-            await updateGame("✅ Chuyền thành công! Hũ tiền đã tăng lên.");
-        } 
-        
-        else if (i.customId === "hold_bomb") {
-            // Chống trường hợp hack button gửi customId khi chưa đủ lượt
-            if (passCount < 3) return; 
-
+            await updateGame(`> ✅ **${passer}** ${PASS_FLAVOR[Math.floor(Math.random() * PASS_FLAVOR.length)]}\n> 💰 Nhà cái rót thêm **+${money(bonusPerPass)}** vào hũ!`);
+        } else if (i.customId === "hold_bomb") {
+            if (passCount < 3) return; // Chống hack button (giữ nguyên)
             if (Math.random() < 0.5) {
                 return collector.stop("exploded_on_hold");
-            } else {
-                return collector.stop("took_the_money");
             }
+            return collector.stop("took_the_money");
         }
     });
 
     collector.on("end", async (_, reason) => {
-        const loser = players[currentIndex];
-        let resultMsg = "";
+      try {
+        const holder = players[currentIndex];
+        let embed;
 
         if (reason === "exploded") {
-            resultMsg = `💥 **BÙM!!!** Bom nổ khi đang chuyền. <@${loser.id}> làm mất trắng hũ **${pot.toLocaleString()}** VND!`;
-        } 
-        else if (reason === "exploded_on_hold") {
-            resultMsg = `💥 **BÙM!** <@${loser.id}> định ôm tiền chạy nhưng bom nổ tức thì! Tham thì thâm rồi.`;
-        } 
-        else if (reason === "took_the_money") {
-            const winner = players[currentIndex];
-            await User.findOneAndUpdate({ userId: winner.id }, { $inc: { money: pot } });
-            resultMsg = `🏆 **QUÁ ĐỈNH!** <@${winner.id}> đã ôm trọn hũ bom và nhận **${pot.toLocaleString()}** VND!`;
-        } 
-        else {
-            resultMsg = `⏰ Hết thời gian, bom tự nổ! Hũ tiền tan thành mây khói.`;
+            embed = casinoEmbed({ color: COLORS.red, title: "💥 BÙMMMM!!! BOM NỔ GIỮA ĐƯỜNG CHUYỀN!" })
+                .setDescription(
+                    `\`\`\`\n    💥💥💥\n   ☠️ (${holder.username} bay màu)\n\`\`\`` +
+                    `> 💀 <@${holder.id}> ôm trọn vụ nổ ở lượt thứ **${passCount + 1}**!\n` +
+                    `> 🕳️ Hũ **${money(pot)} VND** tan thành mây khói cùng vé của cả đội...`
+                )
+                .setFooter({ text: "💣 Gõ /bomhengio để chơi ván mới!" });
+        } else if (reason === "exploded_on_hold") {
+            embed = casinoEmbed({ color: COLORS.red, title: "💥 THAM THÌ THÂM — NỔ NGAY TRÊN TAY!" })
+                .setDescription(
+                    `\`\`\`\n    🎁💥\n   ☠️ (ôm hụt)\n\`\`\`` +
+                    `> 😈 <@${holder.id}> định ôm **${money(pot)} VND** chạy... nhưng thần may mắn quay lưng!\n` +
+                    `> 🕳️ 50/50 và bạn chọn nhầm cửa tử. Hũ bay màu!`
+                )
+                .setFooter({ text: "💣 Đen thôi đỏ quên đi • /bomhengio làm ván nữa!" });
+        } else if (reason === "took_the_money") {
+            await User.findOneAndUpdate({ userId: holder.id }, { $inc: { money: pot } });
+            embed = casinoEmbed({ color: COLORS.gold, title: "🏆 ÔM TRỌN HŨ BOM — QUÁ ĐỈNH!" })
+                .setDescription(
+                    `\`\`\`\n    🎁💰\n   😎🏃💨 (chuồn êm)\n\`\`\`` +
+                    `> 👑 <@${holder.id}> gan lì vượt qua cửa tử 50/50!\n` +
+                    `> 💰 Ẵm trọn hũ: **\`+${money(pot)} VND\`**\n` +
+                    `> 😭 ${players.length - 1} người còn lại chia nhau... không khí!`
+                )
+                .setFooter({ text: "💣 Thắng làm vua • /bomhengio mở ván mới!" });
+        } else {
+            embed = casinoEmbed({ color: COLORS.dark, title: "⏰ HẾT GIỜ — BOM TỰ HỦY!" })
+                .setDescription(`> 💤 <@${holder.id}> cầm bom mà ngủ gật...\n> 🕳️ Hũ **${money(pot)} VND** tan thành mây khói.`);
         }
 
-        await interaction.editReply({ content: resultMsg, embeds: [], components: [] });
+        await interaction.editReply({ content: null, embeds: [embed], components: [] });
+      } catch (e) {
+        console.error("❌ [bomhengio] Lỗi kết thúc:", e);
+      }
     });
 }

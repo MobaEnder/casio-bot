@@ -1,6 +1,5 @@
 const {
     SlashCommandBuilder,
-    EmbedBuilder,
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
@@ -9,6 +8,20 @@ const {
     TextInputStyle,
 } = require("discord.js");
 const User = require("../models/User");
+const { COLORS, money, vnd, countdown, casinoEmbed } = require("../utils/ui");
+
+const RATE = 0.008; // 0.8%/giờ (giữ nguyên)
+
+// Tính lãi kép tích lũy (giữ nguyên công thức)
+function calcInterest(user) {
+    if (user.bankMoney > 0 && user.lastDepositAt) {
+        const hours = (Date.now() - new Date(user.lastDepositAt).getTime()) / 3600000;
+        if (hours >= 1) {
+            return Math.floor(user.bankMoney * (Math.pow(1 + RATE, Math.floor(hours)) - 1));
+        }
+    }
+    return 0;
+}
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -19,64 +32,59 @@ module.exports = {
         let user = await User.findOne({ userId: interaction.user.id });
         if (!user) user = await User.create({ userId: interaction.user.id });
 
-        // Tính toán lãi suất tạm tính
-        let interest = 0;
+        const interest = calcInterest(user);
+        const totalBank = user.bankMoney + interest;
+        const netWorth = user.money + totalBank;
+
+        // Kỳ tính lãi tiếp theo (mỗi giờ tròn kể từ lúc gửi)
+        let nextTickLine = "> 💤 *Chưa có tiền gửi — gửi ngay để tiền đẻ ra tiền!*";
         if (user.bankMoney > 0 && user.lastDepositAt) {
-            const ms = Date.now() - new Date(user.lastDepositAt).getTime();
-            const hours = ms / (1000 * 60 * 60);
-            if (hours >= 1) {
-                // Công thức lãi kép: Gốc * (1 + r)^n - Gốc (r = 0.8% = 0.008)
-                interest = Math.floor(user.bankMoney * (Math.pow(1.008, Math.floor(hours)) - 1));
-            }
+            const depositTime = new Date(user.lastDepositAt).getTime();
+            const hoursPassed = Math.floor((Date.now() - depositTime) / 3600000);
+            const nextTick = depositTime + (hoursPassed + 1) * 3600000;
+            const nextInterest = Math.floor(totalBank * RATE);
+            nextTickLine = `> ⏳ Kỳ lãi tiếp theo: **${countdown(nextTick)}** (dự kiến **+${money(nextInterest)}**)`;
         }
 
-        const embed = new EmbedBuilder()
-            .setColor("Blue")
-            .setTitle("🏦 NGÂN HÀNG TRUNG ƯƠNG")
+        const deleteAt = Date.now() + 60000;
+        const embed = casinoEmbed({ color: COLORS.blue, title: "🏦 ✦ NGÂN HÀNG TRUNG ƯƠNG ✦ 🏦" })
             .setThumbnail(interaction.user.displayAvatarURL())
             .setDescription(
-                `Chào **${interaction.user.username}**, tình trạng tài sản của bạn:\n\n` +
-                `💵 Tiền mặt: **${user.money.toLocaleString()} VND**\n` +
-                `🏦 Gửi tiết kiệm: **${user.bankMoney.toLocaleString()} VND**\n` +
-                `📈 Lãi tích lũy: **+${interest.toLocaleString()} VND** *(0.8%/h)*\n\n` +
-                `*Lãi suất sẽ được cộng dồn sau mỗi giờ gửi!*`
+                `Chào quý khách **${interaction.user.username}** 🤵\n\n` +
+                `> 📈 Lãi suất: **0.8%/giờ** (lãi kép, cộng dồn mỗi giờ)\n` +
+                nextTickLine
             )
-            .setFooter({ text: "Tự động xóa sau 30 giây" })
-            .setTimestamp();
+            .addFields(
+                { name: "💵 Tiền mặt", value: `\`${money(user.money)}\``, inline: true },
+                { name: "🏦 Sổ tiết kiệm", value: `\`${money(user.bankMoney)}\``, inline: true },
+                { name: "📈 Lãi tích lũy", value: `\`+${money(interest)}\``, inline: true },
+                { name: "💎 Tổng tài sản", value: `**\`${money(netWorth)} VND\`**`, inline: false }
+            )
+            .setFooter({ text: "💡 Tiền trong bank không bị mất khi thua bạc • Bảng tự xóa sau 60s" });
 
         const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId("nganhang_deposit")
-                .setLabel("Gửi Tiền")
-                .setStyle(ButtonStyle.Success),
-            new ButtonBuilder()
-                .setCustomId("nganhang_withdraw")
-                .setLabel("Rút Tiền")
-                .setStyle(ButtonStyle.Danger)
+            new ButtonBuilder().setCustomId("nganhang_deposit").setLabel("Gửi Tiền").setEmoji("📥").setStyle(ButtonStyle.Success),
+            new ButtonBuilder().setCustomId("nganhang_withdraw").setLabel("Rút Tiền").setEmoji("📤").setStyle(ButtonStyle.Danger)
         );
 
-        const response = await interaction.reply({
+        await interaction.reply({
+            content: `🗑️ *Bảng tự xóa ${countdown(deleteAt)}*`,
             embeds: [embed],
             components: [row],
-            withResponse: true
         });
 
-        // Xóa tin nhắn sau 30s để tránh rác kênh
         setTimeout(async () => {
-            try {
-                await interaction.deleteReply();
-            } catch (e) {}
-        }, 30000);
+            try { await interaction.deleteReply(); } catch (e) {}
+        }, 60000);
     },
 
-    // ================= XỬ LÝ NÚT BẤM =================
+    // ================= NÚT BẤM =================
     async handleButton(interaction) {
-        // ID: nganhang_deposit -> action là deposit
-        const action = interaction.customId.split("_")[1]; 
-        
+        const action = interaction.customId.split("_")[1];
+
         const modal = new ModalBuilder()
             .setCustomId(`nganhang_modal_${action}`)
-            .setTitle(action === "deposit" ? "📥 GỬI TIỀN" : "📤 RÚT TIỀN");
+            .setTitle(action === "deposit" ? "📥 GỬI TIỀN TIẾT KIỆM" : "📤 RÚT TIỀN VỀ VÍ");
 
         const input = new TextInputBuilder()
             .setCustomId("amount_input")
@@ -89,11 +97,10 @@ module.exports = {
         await interaction.showModal(modal);
     },
 
-    // ================= XỬ LÝ MODAL =================
+    // ================= MODAL =================
     async handleModal(interaction) {
-        // ID: nganhang_modal_deposit -> action là index 2
         const action = interaction.customId.split("_")[2];
-        let val = interaction.fields.getTextInputValue("amount_input").toLowerCase();
+        let val = interaction.fields.getTextInputValue("amount_input").toLowerCase().replace(/[.,\s]/g, "");
         let user = await User.findOne({ userId: interaction.user.id });
 
         let amount = 0;
@@ -107,57 +114,71 @@ module.exports = {
             return interaction.reply({ content: "❌ Số tiền không hợp lệ!", flags: 64 });
         }
 
-        // --- LOGIC GỬI TIỀN ---
+        // --- GỬI TIỀN (logic giữ nguyên) ---
         if (action === "deposit") {
-            if (user.money < amount) return interaction.reply({ content: "❌ Bạn không đủ tiền mặt!", flags: 64 });
-            
-            // Chốt lãi cũ nếu có trước khi nạp thêm
+            if (user.money < amount) return interaction.reply({ content: `❌ Ví bạn chỉ còn ${vnd(user.money)}!`, flags: 64 });
+
+            // Chốt lãi cũ trước khi nạp thêm
+            let lockedInterest = 0;
             if (user.bankMoney > 0 && user.lastDepositAt) {
-                const hours = (Date.now() - new Date(user.lastDepositAt).getTime()) / (1000 * 60 * 60);
+                const hours = (Date.now() - new Date(user.lastDepositAt).getTime()) / 3600000;
                 if (hours >= 1) {
-                    const interest = Math.floor(user.bankMoney * (Math.pow(1.008, Math.floor(hours)) - 1));
-                    user.bankMoney += interest;
+                    lockedInterest = Math.floor(user.bankMoney * (Math.pow(1 + RATE, Math.floor(hours)) - 1));
+                    user.bankMoney += lockedInterest;
                 }
             }
 
             user.money -= amount;
             user.bankMoney += amount;
-            user.lastDepositAt = new Date(); // Reset mốc thời gian gửi
+            user.lastDepositAt = new Date();
             await user.save();
 
-            return interaction.reply({ content: `✅ Đã gửi **${amount.toLocaleString()} VND** vào ngân hàng!`, flags: 64 });
+            return interaction.reply({
+                embeds: [casinoEmbed({ color: COLORS.green, title: "📥 GIAO DỊCH GỬI TIỀN THÀNH CÔNG" })
+                    .setDescription(
+                        `> 💰 Đã gửi: **+${money(amount)} VND** vào sổ tiết kiệm\n` +
+                        (lockedInterest > 0 ? `> 📈 Chốt lãi kỳ trước: **+${money(lockedInterest)} VND**\n` : "") +
+                        `> 🏦 Số dư bank: ${vnd(user.bankMoney)}\n` +
+                        `> 💵 Tiền mặt còn: ${vnd(user.money)}\n\n` +
+                        `⏳ Kỳ lãi đầu tiên: ${countdown(Date.now() + 3600000)}`
+                    )],
+                flags: 64,
+            });
         }
 
-        // --- LOGIC RÚT TIỀN ---
+        // --- RÚT TIỀN (logic giữ nguyên) ---
         if (action === "withdraw") {
-            if (user.bankMoney < amount) return interaction.reply({ content: "❌ Ngân hàng không đủ tiền!", flags: 64 });
+            if (user.bankMoney < amount) return interaction.reply({ content: `❌ Bank của bạn chỉ có ${vnd(user.bankMoney)}!`, flags: 64 });
 
-            // Tính lãi tại thời điểm rút
             let interest = 0;
-            const hours = (Date.now() - new Date(user.lastDepositAt).getTime()) / (1000 * 60 * 60);
+            const hours = (Date.now() - new Date(user.lastDepositAt).getTime()) / 3600000;
             if (hours >= 1) {
-                interest = Math.floor(user.bankMoney * (Math.pow(1.008, Math.floor(hours)) - 1));
+                interest = Math.floor(user.bankMoney * (Math.pow(1 + RATE, Math.floor(hours)) - 1));
             }
 
-            const isAll = (amount >= user.bankMoney);
-            
+            const isAll = amount >= user.bankMoney;
+
             user.bankMoney -= amount;
-            // Nếu rút hết thì cộng luôn lãi vào tiền mặt, nếu rút một phần thì chốt lãi vào gốc bank
             if (isAll) {
-                user.money += (amount + interest);
+                user.money += amount + interest;
                 user.lastDepositAt = null;
             } else {
                 user.money += amount;
                 user.bankMoney += interest;
                 user.lastDepositAt = new Date();
             }
-
             await user.save();
 
-            let msg = `✅ Đã rút **${amount.toLocaleString()} VND** về ví tiền mặt!`;
-            if (interest > 0) msg += `\n🎁 Bạn nhận được **${interest.toLocaleString()} VND** tiền lãi tích lũy!`;
-            
-            return interaction.reply({ content: msg, flags: 64 });
+            return interaction.reply({
+                embeds: [casinoEmbed({ color: COLORS.gold, title: "📤 GIAO DỊCH RÚT TIỀN THÀNH CÔNG" })
+                    .setDescription(
+                        `> 💵 Đã rút: **${money(amount)} VND** về ví\n` +
+                        (interest > 0 ? `> 🎁 ${isAll ? "Lãi tích lũy nhận kèm" : "Lãi được chốt vào gốc bank"}: **+${money(interest)} VND**\n` : "") +
+                        `> 🏦 Bank còn: ${vnd(user.bankMoney)}\n` +
+                        `> 💰 Ví hiện tại: ${vnd(user.money)}`
+                    )],
+                flags: 64,
+            });
         }
-    }
+    },
 };

@@ -1,26 +1,20 @@
 const {
     SlashCommandBuilder,
-    EmbedBuilder,
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
 } = require("discord.js");
 const User = require("../models/User");
+const { COLORS, money, vnd, countdown, casinoEmbed } = require("../utils/ui");
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("vaytien")
         .setDescription("🏦 Lập hợp đồng vay vốn từ người chơi khác")
-        .addUserOption(opt =>
-            opt.setName("nguoi").setDescription("Chủ nợ tương lai").setRequired(true)
-        )
-        .addIntegerOption(opt =>
-            opt.setName("sotien").setDescription("Số tiền muốn vay").setRequired(true)
-        )
-        .addStringOption(opt =>
-            opt.setName("thoihan")
-                .setDescription("Thời hạn trả (Ví dụ: 30m, 2h, 24h)")
-                .setRequired(true)
+        .addUserOption((opt) => opt.setName("nguoi").setDescription("Chủ nợ tương lai").setRequired(true))
+        .addIntegerOption((opt) => opt.setName("sotien").setDescription("Số tiền muốn vay").setRequired(true))
+        .addStringOption((opt) =>
+            opt.setName("thoihan").setDescription("Thời hạn trả (Ví dụ: 30m, 2h, 24h)").setRequired(true)
         ),
 
     async execute(interaction) {
@@ -29,14 +23,12 @@ module.exports = {
         const amount = interaction.options.getInteger("sotien");
         const timeInput = interaction.options.getString("thoihan").toLowerCase();
 
-        // --- LOGIC XỬ LÝ THỜI GIAN ---
-        const timeRegex = /^(\d+)(m|h)$/;
-        const match = timeInput.match(timeRegex);
-
+        // --- XỬ LÝ THỜI GIAN (giữ nguyên) ---
+        const match = timeInput.match(/^(\d+)(m|h)$/);
         if (!match) {
-            return interaction.reply({ 
-                content: "❌ Định dạng thời gian sai! Sử dụng `1m-60m` (phút) hoặc `1h-24h` (giờ). Ví dụ: `30m` hoặc `2h`.", 
-                flags: 64 
+            return interaction.reply({
+                content: "❌ Định dạng thời gian sai! Sử dụng `1m-60m` (phút) hoặc `1h-24h` (giờ). Ví dụ: `30m` hoặc `2h`.",
+                flags: 64,
             });
         }
 
@@ -49,61 +41,57 @@ module.exports = {
             if (value < 1 || value > 60) return interaction.reply({ content: "❌ Thời hạn phút phải từ `1m` đến `60m`.", flags: 64 });
             durationMs = value * 60 * 1000;
             displayTime = `${value} phút`;
-        } else if (unit === "h") {
+        } else {
             if (value < 1 || value > 24) return interaction.reply({ content: "❌ Thời hạn giờ phải từ `1h` đến `24h`.", flags: 64 });
             durationMs = value * 60 * 60 * 1000;
             displayTime = `${value} giờ`;
         }
-        // -----------------------------
 
         if (lender.id === borrower.id)
             return interaction.reply({ content: "❌ Bạn định lấy tiền túi trái bỏ vào túi phải à? Không vay chính mình nhé!", flags: 64 });
-
+        if (lender.bot)
+            return interaction.reply({ content: "🤖 Bot không có tiền cho vay đâu, tìm người thật đi!", flags: 64 });
         if (amount < 1000)
             return interaction.reply({ content: "❌ Số tiền quá nhỏ, không đáng để lập hợp đồng (Tối thiểu 1,000 VND).", flags: 64 });
 
-        const borrowerData = await User.findOneAndUpdate(
-            { userId: borrower.id },
-            {},
-            { upsert: true, new: true }
-        );
+        const borrowerData = await User.findOneAndUpdate({ userId: borrower.id }, {}, { upsert: true, new: true });
 
         if (borrowerData.loan && borrowerData.loan.active) {
             return interaction.reply({
-                content: "❌ Bạn đang có một khoản nợ chưa quyết toán! Trả hết rồi mới được vay tiếp.",
+                content: `❌ Bạn đang nợ <@${borrowerData.loan.from}> **${money(borrowerData.loan.amount)} VND** chưa quyết toán! Dùng \`/tratien\` trả hết rồi mới được vay tiếp.`,
                 flags: 64,
             });
         }
+        if (borrowerData.banned) {
+            return interaction.reply({ content: "🚫 Bạn đang bị phong tỏa vì trốn nợ, không thể vay tiếp!", flags: 64 });
+        }
 
-        const lenderData = await User.findOneAndUpdate(
-            { userId: lender.id },
-            {},
-            { upsert: true, new: true }
-        );
+        const lenderData = await User.findOneAndUpdate({ userId: lender.id }, {}, { upsert: true, new: true });
 
         if (lenderData.money < amount) {
             return interaction.reply({
-                content: `❌ <@${lender.id}> không đủ tiền cho bạn vay đâu (Họ chỉ có ${lenderData.money.toLocaleString()} VND).`,
+                content: `❌ <@${lender.id}> không đủ tiền cho bạn vay đâu (Họ chỉ có ${vnd(lenderData.money)}).`,
                 flags: 64,
             });
         }
 
         const dueAt = new Date(Date.now() + durationMs);
+        const interest = Math.floor(amount * 0.1);
+        const totalRepay = amount + interest;
 
-        const embed = new EmbedBuilder()
-            .setColor("Gold")
-            .setTitle("📝 HỢP ĐỒNG VAY VỐN ĐEN")
+        const embed = casinoEmbed({ color: COLORS.gold, title: "📝 ✦ HỢP ĐỒNG VAY VỐN ĐEN ✦ 📝" })
             .setThumbnail("https://www.pvcombank.com.vn/static/SEO/vay-von-dau-tu-1.jpg")
             .setDescription(
-                `👤 **Bên vay:** ${borrower}\n` +
-                `🏦 **Bên cho vay:** ${lender}\n` +
-                `💰 **Số tiền vay:** \`${amount.toLocaleString()} VND\`\n` +
-                `⏳ **Thời hạn trả:** \`${displayTime}\`\n\n` +
-                `⚠️ **ĐIỀU KHOẢN:**\n` +
-                `*Nếu không trả trước <t:${Math.floor(dueAt.getTime() / 1000)}:f>, hệ thống sẽ tự động quét ngân hàng/ví để trừ nợ. Nếu cháy túi, bạn sẽ bị **BAN VĨNH VIỄN**.*`
+                `\`\`\`\n═══════ ĐIỀU KHOẢN ═══════\n\`\`\`` +
+                `> 👤 **Bên vay (A):** ${borrower}\n` +
+                `> 🏦 **Bên cho vay (B):** ${lender}\n${"─".repeat(25)}\n` +
+                `> 💰 **Tiền gốc:** \`${money(amount)} VND\`\n` +
+                `> 📈 **Lãi suất:** 10% → \`+${money(interest)} VND\`\n` +
+                `> 💸 **Tổng phải trả:** **\`${money(totalRepay)} VND\`**\n` +
+                `> ⏳ **Thời hạn:** ${displayTime} — đáo hạn ${countdown(dueAt.getTime())}\n\n` +
+                `⚠️ **ĐIỀU KHOẢN PHẠT:** Quá hạn <t:${Math.floor(dueAt.getTime() / 1000)}:f>, hệ thống tự động quét ví/ngân hàng bên A để siết nợ. Nếu cháy túi → **BAN VĨNH VIỄN** khỏi casino.`
             )
-            .setFooter({ text: "Nhấn nút dưới đây để ký tên xác nhận" })
-            .setTimestamp();
+            .setFooter({ text: "✍️ Chủ nợ bấm nút bên dưới để ký tên xác nhận" });
 
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
@@ -115,6 +103,7 @@ module.exports = {
                 .setCustomId(`vaytien_decline_${borrower.id}_${lender.id}`)
                 .setLabel("Từ Chối")
                 .setStyle(ButtonStyle.Danger)
+                .setEmoji("🚫")
         );
 
         await interaction.reply({
@@ -136,12 +125,18 @@ module.exports = {
         const lender = await User.findOne({ userId: lenderId });
 
         if (action === "decline") {
-            return interaction.update({ content: "📉 **Hợp đồng đã bị hủy bỏ.** Người cho vay đã từ chối.", embeds: [], components: [] });
+            return interaction.update({
+                content: null,
+                embeds: [casinoEmbed({ color: COLORS.dark, title: "📉 HỢP ĐỒNG BỊ HỦY BỎ", description: `> 🚫 <@${lenderId}> đã từ chối cho vay.\n> *"Tiền bạc phân minh, ái tình sòng phẳng!"*` })],
+                components: [],
+            });
         }
 
         if (action === "accept") {
             const amt = Number(amount);
             if (!lender || lender.money < amt) return interaction.reply({ content: "❌ Tiền trong ví bạn vừa bốc hơi rồi, không đủ cho vay nữa!", flags: 64 });
+            if (!borrower) return interaction.reply({ content: "❌ Không tìm thấy dữ liệu bên vay!", flags: 64 });
+            if (borrower.loan && borrower.loan.active) return interaction.reply({ content: "❌ Bên vay vừa gánh một khoản nợ khác rồi!", flags: 64 });
 
             lender.money -= amt;
             await lender.save();
@@ -155,17 +150,19 @@ module.exports = {
             };
             await borrower.save();
 
-            const successEmbed = new EmbedBuilder()
-                .setColor("Green")
-                .setTitle("✅ GIAO DỊCH HOÀN TẤT")
-                .setDescription(
-                    `💸 <@${lenderId}> đã chuyển **${amt.toLocaleString()} VND** cho <@${borrowerId}>.\n\n` +
-                    `⏰ Hạn cuối thanh toán: <t:${Math.floor(Number(dueAt) / 1000)}:R>\n` +
-                    `📌 Hãy dùng lệnh \`/trano\` để thanh toán trước khi quá hạn!`
-                )
-                .setTimestamp();
-
-            return interaction.update({ content: null, embeds: [successEmbed], components: [] });
+            const totalRepay = amt + Math.floor(amt * 0.1);
+            return interaction.update({
+                content: null,
+                embeds: [casinoEmbed({ color: COLORS.green, title: "✅ HỢP ĐỒNG ĐÃ KÝ — TIỀN ĐÃ GIẢI NGÂN" })
+                    .setDescription(
+                        `> 💸 <@${lenderId}> đã chuyển **${money(amt)} VND** cho <@${borrowerId}>\n${"─".repeat(25)}\n` +
+                        `> ⏰ Đáo hạn: **${countdown(Number(dueAt))}** (<t:${Math.floor(Number(dueAt) / 1000)}:f>)\n` +
+                        `> 💸 Tổng phải trả (gốc + lãi 10%): **\`${money(totalRepay)} VND\`**\n\n` +
+                        `📌 Bên vay dùng lệnh \`/tratien\` để thanh toán trước khi quá hạn!`
+                    )
+                    .setFooter({ text: "🏦 Casino Bank — Uy tín tạo nên thương hiệu 😈" })],
+                components: [],
+            });
         }
-    }
+    },
 };

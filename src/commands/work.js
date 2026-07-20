@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const User = require("../models/User");
+const { COLORS, money, vnd, countdown, casinoEmbed } = require("../utils/ui");
 
 const jobs = [
     // --- Nhóm Lao Động Phổ Thông (60k - 150k) ---
@@ -116,6 +117,14 @@ const jokes = [
     "🥳 Xong việc rồi! Cầm tiền này đi 'all-in' thôi nào!"
 ];
 
+// Phân hạng nghề theo mức lương tối đa
+function jobTier(maxSalary) {
+    if (maxSalary >= 260000) return { icon: "💎", label: "KỸ THUẬT & ĐỘC LẠ" };
+    if (maxSalary >= 210000) return { icon: "🎨", label: "NGHỆ THUẬT & FREELANCE" };
+    if (maxSalary >= 160000) return { icon: "👔", label: "DỊCH VỤ & VĂN PHÒNG" };
+    return { icon: "👷", label: "LAO ĐỘNG PHỔ THÔNG" };
+}
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("work")
@@ -124,7 +133,6 @@ module.exports = {
     async execute(interaction) {
         const userId = interaction.user.id;
         let user = await User.findOne({ userId });
-
         if (!user) user = await User.create({ userId });
 
         if (user.banned) {
@@ -132,15 +140,13 @@ module.exports = {
         }
 
         const now = Date.now();
-        const cooldown = 3 * 60 * 1000; // 3 phút
+        const cooldown = 3 * 60 * 1000; // 3 phút (giữ nguyên)
 
+        // ⏳ Đếm ngược trực tiếp thay vì "X phút Y giây" tĩnh
         if (user.lastWork && now - new Date(user.lastWork).getTime() < cooldown) {
-            const remaining = cooldown - (now - new Date(user.lastWork).getTime());
-            const minutes = Math.floor(remaining / 60000);
-            const seconds = Math.ceil((remaining % 60000) / 1000);
-
+            const readyAt = new Date(user.lastWork).getTime() + cooldown;
             return interaction.reply({
-                content: `⏳ Bạn vừa làm rồi, nghỉ tí đi! Quay lại sau **${minutes} phút ${seconds} giây** nữa nhé 😴`,
+                content: `😴 Bạn vừa tan ca xong, nghỉ tí đi sếp ơi!\n⏳ Ca làm tiếp theo bắt đầu ${countdown(readyAt)}`,
                 flags: 64,
             });
         }
@@ -148,22 +154,26 @@ module.exports = {
         const job = jobs[Math.floor(Math.random() * jobs.length)];
         const reward = Math.floor(Math.random() * (job.max - job.min + 1)) + job.min;
         const joke = jokes[Math.floor(Math.random() * jokes.length)];
+        const tier = jobTier(job.max);
+        const nextAt = now + cooldown;
 
         user.money += reward;
         user.lastWork = new Date();
         await user.save();
 
-        const embed = new EmbedBuilder()
-            .setColor(0x00ff99)
-            .setTitle("⚒️ NHẬT KÝ LAO ĐỘNG")
+        const embed = casinoEmbed({ color: COLORS.green, title: "⚒️ BẢNG LƯƠNG HÔM NAY ⚒️" })
             .setThumbnail(interaction.user.displayAvatarURL({ dynamic: true }))
-            .addFields(
-                { name: "👷 Công việc", value: `\`${job.name}\``, inline: true },
-                { name: "💰 Thu nhập", value: `\`+${reward.toLocaleString()} VND\``, inline: true },
-                { name: "✨ Trạng thái", value: `*${joke}*` }
+            .setDescription(
+                `> ${tier.icon} **Ngành nghề:** ${tier.label}\n` +
+                `> 👷 **Công việc:** ${job.name}\n\n` +
+                `# 💸 +${money(reward)} VND\n` +
+                `> *${joke}*`
             )
-            .setFooter({ text: `Ví hiện tại: ${user.money.toLocaleString()} VND | Chăm chỉ thì mới có ăn!` })
-            .setTimestamp();
+            .addFields(
+                { name: "💼 Ví hiện tại", value: vnd(user.money), inline: true },
+                { name: "🔄 Ca tiếp theo", value: countdown(nextAt), inline: true }
+            )
+            .setFooter({ text: "Chăm chỉ thì mới có ăn! 💪" });
 
         await interaction.reply({ embeds: [embed] });
     },
